@@ -20,7 +20,7 @@ logger = setup_logger('ha_cursor_agent', LOG_LEVEL)
 app = FastAPI(
     title="HA Cursor Agent API",
     description="AI Agent API for Home Assistant - enables Cursor AI to manage HA configuration",
-    version="1.0.1",
+    version="1.0.2",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -83,7 +83,7 @@ async def root():
     """Root endpoint with API information"""
     return {
         "name": "HA Cursor Agent API",
-        "version": "1.0.1",
+        "version": "1.0.2",
         "description": "AI Agent API for Home Assistant",
         "docs": "/docs",
         "ai_instructions": "/api/ai/instructions",
@@ -105,7 +105,7 @@ async def health():
     """Health check endpoint (no auth required)"""
     return {
         "status": "healthy",
-        "version": "1.0.1",
+        "version": "1.0.2",
         "config_path": os.getenv('CONFIG_PATH', '/config'),
         "git_enabled": os.getenv('ENABLE_GIT', 'false') == 'true',
         "ai_instructions": "/api/ai/instructions"
