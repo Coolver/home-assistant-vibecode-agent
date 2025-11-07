@@ -86,6 +86,65 @@ Open `http://homeassistant.local:8099/docs` and explore! 🎉
 
 ---
 
+## 🤖 Using with Cursor AI
+
+This add-on enables **Cursor AI to autonomously manage your Home Assistant** through natural language prompts - no manual copy-pasting needed!
+
+### How to Connect Cursor AI
+
+Once the add-on is installed and running, give Cursor AI this prompt:
+
+```
+I have HA Cursor Agent running on my Home Assistant.
+
+Token: YOUR_LONG_LIVED_ACCESS_TOKEN
+API URL: http://homeassistant.local:8099
+API Documentation: http://homeassistant.local:8099/docs
+
+You can now use this API to:
+- Read and modify my Home Assistant configuration files
+- Create helpers, automations, and scripts automatically
+- Query all my devices and entities
+- Manage everything with automatic Git backups
+
+Please help me set up [describe what you want].
+```
+
+### Example Prompts
+
+**Install Climate Control System:**
+```
+Install Climate Control V3 with buffer radiators for my TRVs.
+Analyze my current setup and configure it automatically.
+```
+
+**Create Automation:**
+```
+Create an automation that turns on my living room lights 
+when motion is detected after sunset.
+```
+
+**Configure System:**
+```
+Set up a presence detection system using my phone's 
+location and notify me when I'm approaching home.
+```
+
+### What Cursor AI Can Do
+
+With this add-on, Cursor AI can:
+
+✅ **Read your entire HA configuration** - no need to paste files  
+✅ **Create complex systems in seconds** - automations, scripts, helpers  
+✅ **Automatic backups** - every change is Git-versioned  
+✅ **Intelligent analysis** - understands your devices and entities  
+✅ **Error recovery** - can rollback if something goes wrong  
+✅ **Complete autonomy** - from analysis to deployment  
+
+**No more manual copy-pasting YAML configs!** 🚀
+
+---
+
 ## 🚀 Installation (Detailed)
 
 ### Option 1: Via GitHub Repository (Recommended)
