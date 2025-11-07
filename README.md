@@ -92,6 +92,18 @@ Open `http://homeassistant.local:8099/docs` and explore! 🎉
 
 This add-on enables **Cursor AI to autonomously manage your Home Assistant** through natural language prompts - no manual copy-pasting needed!
 
+### ⚠️ Important Disclaimer
+
+**This tool is designed for experienced Home Assistant users who understand what they're doing.** 
+
+- ✅ **Always review changes** before applying them to production systems
+- ⚠️ **Cursor AI can accidentally break your configuration** if given incorrect instructions or outdated information
+- 💾 **Git versioning is enabled by default** - all changes are backed up and can be rolled back
+- 🔄 **Test in a safe environment first** if you're new to AI-driven automation
+- 📖 **Verify syntax and compatibility** with your Home Assistant version
+
+**Use at your own risk. The automatic backup system minimizes risk but doesn't eliminate it.**
+
 ### How to Connect Cursor AI
 
 Once the add-on is installed and running, give Cursor AI this prompt:
@@ -103,13 +115,38 @@ Token: YOUR_LONG_LIVED_ACCESS_TOKEN
 API URL: http://homeassistant.local:8099
 API Documentation: http://homeassistant.local:8099/docs
 
+CRITICAL INSTRUCTIONS - READ CAREFULLY:
+
+1. ALWAYS analyze my current Home Assistant configuration files FIRST
+   - Read configuration.yaml to understand my HA version and setup
+   - Check existing automations.yaml, scripts.yaml format
+   - Identify current integrations and their syntax
+
+2. VERIFY compatibility before making changes:
+   - Compare your knowledge with my actual HA version
+   - If uncertain about syntax, CHECK the current file format first
+   - DO NOT use deprecated YAML syntax or outdated configuration formats
+   - When in doubt, ask me to confirm the approach
+
+3. Safety protocols:
+   - ALWAYS create a Git backup before modifications (use /api/backup/commit)
+   - Show me what you're going to change BEFORE applying it
+   - Provide links to view changes in browser when relevant
+   - If configuration check fails, immediately rollback
+
+4. After making changes, provide me with:
+   - Summary of what was modified
+   - Direct links to verify changes (e.g., http://homeassistant.local:8123/config/automation)
+   - Instructions to test the new functionality
+   - Rollback command if something goes wrong
+
 You can now use this API to:
 - Read and modify my Home Assistant configuration files
 - Create helpers, automations, and scripts automatically
 - Query all my devices and entities
 - Manage everything with automatic Git backups
 
-Please help me set up [describe what you want].
+My request: [describe what you want]
 ```
 
 ### Example Prompts
