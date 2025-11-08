@@ -2,7 +2,7 @@
 
 **AI Agent API for Home Assistant - enables Cursor AI to autonomously manage your HA configuration**
 
-[![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)](https://github.com/Coolver/home-assistant-cursor-agent)
+[![Version](https://img.shields.io/badge/version-1.0.4-blue.svg)](https://github.com/Coolver/home-assistant-cursor-agent)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ---

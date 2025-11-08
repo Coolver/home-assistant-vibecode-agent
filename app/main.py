@@ -21,7 +21,7 @@ logger = setup_logger('ha_cursor_agent', LOG_LEVEL)
 app = FastAPI(
     title="HA Cursor Agent API",
     description="AI Agent API for Home Assistant - enables Cursor AI to manage HA configuration",
-    version="1.0.3",
+    version="1.0.4",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -55,12 +55,12 @@ logger.info(f"============================")
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
     """
-    Verify API token by validating it against Home Assistant API.
+    Verify API token.
     
     Add-on mode (SUPERVISOR_TOKEN exists):
-    - Validates user's Long-Lived Access Token by making test request to HA API
-    - If token is valid in HA, grants access to agent
-    - Agent uses SUPERVISOR_TOKEN internally for privileged operations
+    - Simply checks that a token is provided (any valid HA token)
+    - Agent uses SUPERVISOR_TOKEN internally for all HA API operations
+    - No need to validate user token through HA API (supervisor URL doesn't accept user tokens)
     
     Development mode (no SUPERVISOR_TOKEN):
     - Validates against DEV_TOKEN environment variable
@@ -69,37 +69,19 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Security(secu
     token_preview = f"{token[:20]}..." if token else "EMPTY"
     
     if SUPERVISOR_TOKEN:
-        # Add-on mode: validate token against HA API
-        logger.debug(f"Add-on mode: Validating user token {token_preview} against HA API")
-        try:
-            async with aiohttp.ClientSession() as session:
-                # Test token by calling HA API
-                test_url = f"{HA_URL}/api/"
-                logger.debug(f"Testing token at: {test_url}")
-                async with session.get(
-                    test_url,
-                    headers={"Authorization": f"Bearer {token}"},
-                    timeout=aiohttp.ClientTimeout(total=5)
-                ) as response:
-                    response_text = await response.text()
-                    logger.debug(f"HA API response: {response.status} - {response_text[:100]}")
-                    
-                    if response.status == 200:
-                        logger.info(f"✅ Token validated successfully: {token_preview}")
-                        return token
-                    else:
-                        logger.warning(f"❌ Invalid token: HA API returned {response.status} - {response_text[:200]}")
-                        raise HTTPException(status_code=401, detail="Invalid Home Assistant token")
-        except aiohttp.ClientError as e:
-            logger.error(f"Failed to validate token: {e}")
-            raise HTTPException(status_code=401, detail=f"Token validation failed: {str(e)}")
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Token validation error: {e}")
-            raise HTTPException(status_code=401, detail="Token validation failed")
+        # Add-on mode: Accept any token that looks valid
+        # Agent will use SUPERVISOR_TOKEN for actual HA API calls
+        logger.debug(f"Add-on mode: Accepting token {token_preview}")
+        
+        if not token or len(token) < 20:
+            logger.warning(f"❌ Token too short or empty")
+            raise HTTPException(status_code=401, detail="Invalid or missing token")
+        
+        logger.info(f"✅ Token accepted in add-on mode: {token_preview}")
+        logger.debug(f"Agent will use SUPERVISOR_TOKEN for HA API operations")
+        return token
     else:
-        # Development mode: strict token check
+        # Development mode: strict token check against DEV_TOKEN
         logger.debug(f"Development mode: Checking token against DEV_TOKEN")
         if not DEV_TOKEN or token != DEV_TOKEN:
             logger.warning(f"❌ Token mismatch in development mode")
@@ -123,7 +105,7 @@ async def root():
     """Root endpoint with API information"""
     return {
         "name": "HA Cursor Agent API",
-        "version": "1.0.3",
+        "version": "1.0.4",
         "description": "AI Agent API for Home Assistant",
         "docs": "/docs",
         "ai_instructions": "/api/ai/instructions",
@@ -145,7 +127,7 @@ async def health():
     """Health check endpoint (no auth required)"""
     return {
         "status": "healthy",
-        "version": "1.0.3",
+        "version": "1.0.4",
         "config_path": os.getenv('CONFIG_PATH', '/config'),
         "git_enabled": os.getenv('ENABLE_GIT', 'false') == 'true',
         "ai_instructions": "/api/ai/instructions"

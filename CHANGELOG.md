@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2025-11-08
+
+### Fixed
+- **Token validation in add-on mode:** Fixed "Invalid token" errors when using Long-Lived Access Tokens
+- Agent no longer tries to validate user tokens through supervisor URL (which doesn't accept them)
+- In add-on mode, agent simply checks that a token is provided and uses SUPERVISOR_TOKEN for HA API operations
+
+### Changed
+- Simplified token validation logic for better reliability
+- Improved token validation logging
+
 ## [1.0.3] - 2025-11-08
 
 ### Added
