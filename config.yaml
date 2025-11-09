@@ -1,6 +1,6 @@
 # Home Assistant Add-on Configuration
 name: HA Cursor Agent
-version: "1.0.17"
+version: "2.0.0"
 slug: home_assistant_cursor_agent
 description: AI Agent API for Home Assistant - enables Cursor AI to manage HA configuration
 url: https://github.com/Coolver/home-assistant-cursor-agent

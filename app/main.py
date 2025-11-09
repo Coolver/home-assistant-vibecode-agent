@@ -21,7 +21,7 @@ LOG_LEVEL = os.getenv('LOG_LEVEL', 'info').upper()
 logger = setup_logger('ha_cursor_agent', LOG_LEVEL)
 
 # Agent version
-AGENT_VERSION = "1.0.17"
+AGENT_VERSION = "2.0.0"
 
 # FastAPI app
 app = FastAPI(
@@ -46,8 +46,7 @@ security = HTTPBearer()
 
 # Get tokens and configuration from environment
 SUPERVISOR_TOKEN = os.getenv('SUPERVISOR_TOKEN', '')  # Auto-provided by HA when running as add-on
-# Support both new and old env var names for backward compatibility
-DEV_TOKEN = os.getenv('HA_AGENT_KEY') or os.getenv('HA_TOKEN', '')  # For local development only
+DEV_TOKEN = os.getenv('HA_AGENT_KEY', '')  # For local development only
 HA_URL = os.getenv('HA_URL', 'http://supervisor/core')
 
 # API Key configuration
@@ -150,7 +149,7 @@ logger.info(f"=================================")
 logger.info(f"HA Cursor Agent v{AGENT_VERSION}")
 logger.info(f"=================================")
 logger.info(f"SUPERVISOR_TOKEN: {supervisor_token_status}")
-logger.info(f"DEV_TOKEN (HA_TOKEN): {dev_token_status}")
+logger.info(f"DEV_TOKEN (HA_AGENT_KEY): {dev_token_status}")
 logger.info(f"HA_URL: {HA_URL}")
 logger.info(f"Mode: {'Add-on (using SUPERVISOR_TOKEN for HA API)' if SUPERVISOR_TOKEN else 'Development (using DEV_TOKEN)'}")
 logger.info(f"API Key: {'Custom (from config)' if API_KEY_FROM_CONFIG else 'Auto-generated'}")

@@ -2,6 +2,55 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2025-11-08
+
+### 🚨 BREAKING CHANGES
+
+- **Removed `HA_TOKEN` support** - only `HA_AGENT_KEY` is accepted now
+  - Old configurations with `HA_TOKEN` will **STOP WORKING**
+  - Must update to `HA_AGENT_KEY` in mcp.json
+  - Cleaner API without legacy code
+
+### Migration Required
+
+**If you're using `HA_TOKEN`:**
+```json
+// OLD (will not work):
+{
+  "env": {
+    "HA_TOKEN": "your-key"
+  }
+}
+
+// NEW (required):
+{
+  "env": {
+    "HA_AGENT_KEY": "your-key"
+  }
+}
+```
+
+**How to migrate:**
+1. Update add-on to v2.0.0
+2. Update MCP to v2.0.0
+3. Change `HA_TOKEN` → `HA_AGENT_KEY` in your mcp.json
+4. Restart Cursor
+
+### Why This Change?
+
+- ✅ Cleaner, more accurate naming
+- ✅ No confusion with Home Assistant tokens
+- ✅ Simpler codebase (no legacy support)
+- ✅ Clear API semantics
+
+## [1.0.18] - 2025-11-08
+
+### Fixed
+- **UI text consistency** - removed reference to manual file editing
+  - Was: "Copy it to ~/.cursor/mcp.json"
+  - Now: "Copy and paste it in Cursor Settings"
+  - Aligned with Step 2 instructions (Settings → Tools & MCP)
+
 ## [1.0.17] - 2025-11-08
 
 ### Fixed

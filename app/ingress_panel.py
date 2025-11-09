@@ -351,7 +351,7 @@ def generate_ingress_html(api_key: str, agent_version: str) -> str:
             <div class="card">
                 <h2>📋 Step 1: Copy Configuration</h2>
                 <p style="color: #8b949e; margin-bottom: 16px;">
-                    This is your complete Cursor MCP configuration. Copy it to <code style="background: #161b22; padding: 2px 6px; border-radius: 3px; color: #79c0ff;">~/.cursor/mcp.json</code>
+                    This is your complete Cursor MCP configuration. Copy and paste it in Cursor Settings.
                 </p>
                 
                 <div class="config-block">
