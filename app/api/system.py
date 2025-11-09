@@ -40,7 +40,8 @@ async def reload_component(
         logger.error(f"Failed to reload component: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/check_config", response_model=Response)
+@router.post("/check-config", response_model=Response)
+@router.post("/check_config", response_model=Response)  # Legacy compatibility
 async def check_config():
     """
     Check Home Assistant configuration validity

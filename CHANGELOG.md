@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] - 2025-11-09
+
+### Fixed
+- **API endpoint naming** - added `/api/system/check-config` endpoint
+  - MCP was calling `/check-config` (with dash)
+  - Agent only had `/check_config` (with underscore)
+  - Now supports both for compatibility
+  - Fixes 404 Not Found error when checking configuration
+
 ## [2.0.0] - 2025-11-08
 
 ### 🚨 BREAKING CHANGES
