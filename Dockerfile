@@ -1,7 +1,7 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
-# Version: 2.3.8 - Fix Supervisor API URL paths
+# Version: 2.3.9 - Enhanced AI Instructions for add-on management
 # Install system dependencies
 RUN apk add --no-cache \
     git \

@@ -12,7 +12,7 @@ AI_INSTRUCTIONS = """
 HA CURSOR AGENT - INSTRUCTIONS FOR AI ASSISTANTS
 ================================================================================
 
-Version: 2.3.0
+Version: 2.3.8
 Base URL: http://homeassistant.local:8099
 Interactive Docs: http://homeassistant.local:8099/docs
 
@@ -396,20 +396,104 @@ Home Assistant add-ons extend functionality with services like MQTT brokers,
 Zigbee coordinators, databases, and more. You can install, configure, and manage
 add-ons programmatically.
 
-## 📋 COMMON ADD-ONS
+## ⚠️ IMPORTANT: Why Popular Add-ons May Not Appear
 
-**Official Core Add-ons:**
-- `core_mosquitto` - Mosquitto MQTT Broker
-- `core_mariadb` - MariaDB database
-- `core_file_editor` - File Editor
-- `core_ssh` - Terminal & SSH
-- `core_git_pull` - Git Pull
+**If you see only 1-2 add-ons in the list:**
+- The installation has **minimal repositories** connected
+- Popular add-ons (Zigbee2MQTT, Node-RED, ESPHome) require **community repositories**
+- Core add-ons are from official Home Assistant repository
 
-**Community Add-ons (most popular):**
-- `a0d7b954_zigbee2mqtt` - Zigbee2MQTT (Zigbee coordinator)
-- `a0d7b954_nodered` - Node-RED (visual automation)
-- `a0d7b954_esphome` - ESPHome (DIY devices)
-- `core_duckdns` - DuckDNS (dynamic DNS)
+**To see more add-ons, users need to:**
+1. Open Home Assistant UI
+2. Go to: **Settings → Add-ons → Add-on Store**
+3. Click: **⋮** (three dots) → **Repositories**
+4. Add repository URL (e.g., https://github.com/hassio-addons/repository)
+5. Refresh the page
+
+**You CANNOT add repositories via API** - this requires manual UI interaction.
+
+## 📋 POPULAR ADD-ONS AND THEIR PURPOSE
+
+**Communication & Integration:**
+- 🔌 **Mosquitto MQTT Broker** (`core_mosquitto`)
+  - Purpose: Message broker for IoT devices communication
+  - Use: Required for Zigbee2MQTT, Tasmota, ESPHome devices
+  - Install: Always available (core add-on)
+
+- 📡 **Zigbee2MQTT** (slug varies, search in list)
+  - Purpose: Connect Zigbee devices without proprietary hubs
+  - Use: Xiaomi, IKEA, Philips Hue devices via USB coordinator
+  - Requires: Mosquitto MQTT + Zigbee USB dongle
+  - Common slugs: Contains "zigbee2mqtt" in name
+
+- 🔵 **Bluetooth Proxy** / **Matter Server**
+  - Purpose: Connect Bluetooth/Matter devices
+  - Use: Modern smart home standard support
+
+**Automation & Development:**
+- 🌊 **Node-RED** (slug varies, search in list)
+  - Purpose: Visual programming for automation flows
+  - Use: Complex automations, integrations, API workflows
+  - Common slugs: Contains "nodered" in name
+
+- ⚡ **ESPHome** (slug varies, search in list)
+  - Purpose: Firmware for ESP8266/ESP32 DIY devices
+  - Use: Create custom sensors, switches, climate control
+  - Common slugs: Contains "esphome" in name
+
+- 📝 **File Editor** (`core_file_editor` or `core_configurator`)
+  - Purpose: Edit configuration files via web interface
+  - Use: Quick YAML edits without SSH
+  - Install: Usually pre-installed
+
+**System & Networking:**
+- 🖥️ **Terminal & SSH** (`core_ssh`)
+  - Purpose: Command-line access to Home Assistant
+  - Use: Advanced troubleshooting, manual configuration
+  
+- 🔐 **DuckDNS** / **Let's Encrypt** / **Nginx Proxy**
+  - Purpose: Remote access with HTTPS
+  - Use: Secure external access to Home Assistant
+
+- 💾 **MariaDB** (`core_mariadb`)
+  - Purpose: Database for long-term storage
+  - Use: Replace SQLite for better performance
+
+**Media & Entertainment:**
+- 🎵 **Music Assistant**, **Plex**, **Jellyfin**
+  - Purpose: Media server integration
+  - Use: Music/video streaming to HA
+
+## 🎯 HOW TO FIND ADD-ONS
+
+**Don't use hardcoded slugs!** Slugs vary between installations.
+
+**Instead:**
+1. List all available add-ons:
+   ```
+   GET /api/addons/available
+   ```
+
+2. Search by name in the results:
+   - Search for "zigbee" → find Zigbee2MQTT add-on
+   - Search for "mqtt" → find Mosquitto
+   - Search for "node" → find Node-RED
+
+3. Use the `slug` from the response for subsequent operations
+
+**Example workflow:**
+```python
+# Get all add-ons
+response = GET /api/addons/available
+addons = response.data.all
+
+# Find Zigbee2MQTT
+zigbee_addon = find addon where name contains "zigbee2mqtt"
+slug = zigbee_addon.slug
+
+# Install using correct slug
+POST /api/addons/{slug}/install
+```
 
 ## 🚀 ADD-ON WORKFLOW
 
@@ -467,21 +551,32 @@ Essential for troubleshooting startup issues.
 
 **You should:**
 ```
-1. Install add-on:
-   POST /api/addons/a0d7b954_zigbee2mqtt/install
+1. Check if Zigbee2MQTT is available:
+   GET /api/addons/available
+   - Search for add-on with "zigbee2mqtt" in name
+   - If NOT found → tell user to add community repository first:
+     "Zigbee2MQTT requires a community repository. Please add:
+      Settings → Add-ons → ⋮ → Repositories → Add:
+      https://github.com/zigbee2mqtt/hassio-zigbee2mqtt"
+   - If found → get the slug from response
+
+2. Install add-on (using slug from step 1):
+   POST /api/addons/{slug}/install
    (This takes 3-5 minutes)
+   ⏳ Tell user: "Installing Zigbee2MQTT... this may take 3-5 minutes"
 
-2. Detect USB device:
-   POST /api/system/execute
-   Body: {"command": "ls -la /dev/tty*"}
-   (Look for devices like /dev/ttyUSB0 or /dev/ttyACM0)
+3. Install Mosquitto if needed:
+   GET /api/addons/available → find core_mosquitto
+   If not installed:
+   POST /api/addons/core_mosquitto/install
+   POST /api/addons/core_mosquitto/start
 
-3. Configure serial port:
-   POST /api/addons/a0d7b954_zigbee2mqtt/options
+4. Configure Zigbee2MQTT:
+   POST /api/addons/{slug}/options
    Body: {
      "options": {
        "serial": {
-         "port": "/dev/ttyUSB0"
+         "port": "/dev/ttyUSB0"  # User must specify their device
        },
        "mqtt": {
          "server": "mqtt://core-mosquitto"
@@ -489,50 +584,85 @@ Essential for troubleshooting startup issues.
      }
    }
 
-4. Start add-on:
-   POST /api/addons/a0d7b954_zigbee2mqtt/start
+5. Start add-on:
+   POST /api/addons/{slug}/start
 
-5. Monitor logs:
-   GET /api/addons/a0d7b954_zigbee2mqtt/logs?lines=50
+6. Monitor logs:
+   GET /api/addons/{slug}/logs?lines=50
    (Check for successful connection to coordinator)
 
-6. Guide user:
-   "Zigbee2MQTT is now running. Open the web UI at:
-    http://homeassistant.local:8099/hassio/ingress/a0d7b954_zigbee2mqtt
-    to pair devices."
+7. Guide user:
+   "✅ Zigbee2MQTT is now running!
+   - Open web UI to pair devices
+   - Start pairing mode and bring devices close"
 ```
 
-### Use Case 2: Install Complete Smart Home Stack
+### Use Case 2: User Asks About Add-ons
 
-**User:** "Setup infrastructure for Zigbee devices"
+**User:** "What add-ons do you recommend for my smart home?"
 
 **You should:**
 ```
-1. Install Mosquitto MQTT broker:
-   POST /api/addons/core_mosquitto/install
-   POST /api/addons/core_mosquitto/start
-
-2. Wait 30 seconds for MQTT to be ready
-
-3. Install Zigbee2MQTT:
-   POST /api/addons/a0d7b954_zigbee2mqtt/install
+1. Get current add-ons:
+   GET /api/addons/available
    
-4. Configure Z2M to use local MQTT:
-   POST /api/addons/a0d7b954_zigbee2mqtt/options
-   Body: {
-     "options": {
-       "mqtt": {
-         "server": "mqtt://core-mosquitto"
-       }
-     }
-   }
+2. Check what's installed and suggest based on common needs:
+   
+   If user mentions Zigbee/Xiaomi/IKEA devices:
+   → "I recommend Zigbee2MQTT + Mosquitto MQTT"
+   → Explain: "Connects Zigbee devices without proprietary hubs"
+   
+   If user wants visual automation:
+   → "I recommend Node-RED"
+   → Explain: "Drag-and-drop automation builder, great for complex flows"
+   
+   If user has DIY/ESP devices:
+   → "I recommend ESPHome"
+   → Explain: "Flash custom firmware on ESP8266/ESP32 boards"
+   
+   If user needs remote access:
+   → "I recommend DuckDNS + Let's Encrypt + Nginx Proxy"
+   → Explain: "Secure HTTPS access from anywhere"
 
-5. Start Zigbee2MQTT:
-   POST /api/addons/a0d7b954_zigbee2mqtt/start
+3. Check availability:
+   - If NOT in list → explain they need to add repository
+   - If in list → offer to install with detailed explanation
 
-6. Install Node-RED (optional):
-   POST /api/addons/a0d7b954_nodered/install
-   POST /api/addons/a0d7b954_nodered/start
+4. Provide repository URLs if needed:
+   - Zigbee2MQTT: https://github.com/zigbee2mqtt/hassio-zigbee2mqtt
+   - Community: https://github.com/hassio-addons/repository
+```
+
+### Use Case 3: Minimal Installation
+
+**User:** "Why do I see so few add-ons?"
+
+**You should:**
+```
+1. Check current add-ons:
+   GET /api/addons/available
+   
+2. Explain the situation:
+   "Your Home Assistant has a minimal installation with only core add-ons.
+   
+   Popular add-ons like Zigbee2MQTT, Node-RED, and ESPHome come from
+   community repositories that need to be added manually.
+   
+   To see more add-ons:
+   1. Open Home Assistant UI
+   2. Settings → Add-ons → Add-on Store
+   3. Click ⋮ (three dots) → Repositories
+   4. Add repository URL
+   5. Refresh page
+   
+   Popular repositories:
+   - Community: https://github.com/hassio-addons/repository
+   - Zigbee2MQTT: https://github.com/zigbee2mqtt/hassio-zigbee2mqtt
+   - ESPHome: https://github.com/esphome/hassio"
+
+3. List what's currently available:
+   - Show all add-ons from GET /api/addons/available
+   - Explain what each one does (using the reference above)
 ```
 
 ### Use Case 3: Troubleshoot Add-on

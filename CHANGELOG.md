@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.9] - 2025-11-09
+
+### 📚 Enhanced AI Instructions
+
+**Improved Add-on Management Guidance:**
+- ✅ Added comprehensive add-on reference guide with purpose and use cases
+- ✅ Explained why popular add-ons may not appear (minimal repository setup)
+- ✅ Removed hardcoded slugs - now dynamically searches add-ons by name
+- ✅ Added instructions for users to add community repositories
+- ✅ Detailed descriptions of popular add-ons:
+  - Mosquitto MQTT Broker (IoT communication)
+  - Zigbee2MQTT (Zigbee devices)
+  - Node-RED (visual automation)
+  - ESPHome (DIY devices)
+  - Terminal & SSH (system access)
+  - MariaDB (database)
+  - DuckDNS/Let's Encrypt (remote access)
+
+**New Use Cases:**
+- "What add-ons do you recommend?" - AI suggests based on user needs
+- "Why do I see so few add-ons?" - AI explains minimal installation
+- Dynamic slug discovery instead of hardcoded values
+
+**Impact:**
+- AI can now provide intelligent recommendations
+- Users understand why certain add-ons aren't visible
+- Better guidance for repository management
+- Safer installations (no hardcoded slugs that may be wrong)
+
+**Changes:**
+- app/api/ai_instructions.py: 2.3.0 → 2.3.9
+- Added 📋 Popular Add-ons Reference
+- Added 🎯 Use Case templates
+- Added ⚠️ Repository requirements explanation
+
 ## [2.3.8] - 2025-11-09
 
 ### 🐛 Critical Bug Fix
