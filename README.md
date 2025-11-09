@@ -91,11 +91,12 @@ Stop manually writing YAML configurations! This add-on enables Cursor AI to anal
 3. **Wait for startup** (~10 seconds)
 
 ### 4. Get Agent Key
-1. Go to **Settings** → **Add-ons** → **HA Cursor Agent**
-2. Click **"Open Web UI"** button
-3. You'll see a beautiful interface with ready-to-use configuration
-4. Click **"Copy Configuration to Clipboard"** button
-5. Done! Configuration copied ✅
+1. Open your **Home Assistant** (usually http://homeassistant.local:8123)
+2. Go to **Settings** → **Add-ons** → **HA Cursor Agent**
+3. Click **"Open Web UI"** button
+4. You'll see a beautiful interface with ready-to-use configuration
+5. Click **"Copy Configuration to Clipboard"** button
+6. Done! Configuration copied ✅
 
 **Alternative ways to get your key:**
 - View in add-on **Logs** (shown on first start)
@@ -128,9 +129,10 @@ This add-on enables **Cursor AI to autonomously manage your Home Assistant** thr
 
 #### 1. Get Your Configuration
 
-1. Go to **Settings** → **Add-ons** → **HA Cursor Agent**
-2. Click **"Open Web UI"**
-3. Click **"Copy Configuration to Clipboard"**
+1. Open your **Home Assistant** (usually http://homeassistant.local:8123)
+2. Go to **Settings** → **Add-ons** → **HA Cursor Agent**
+3. Click **"Open Web UI"**
+4. Click **"Copy Configuration to Clipboard"**
 
 #### 2. Add to Cursor
 
