@@ -466,33 +466,84 @@ def generate_ingress_html(api_key: str, agent_version: str) -> str:
                 const btnIcon = document.getElementById('copyBtnIcon');
                 const btnText = document.getElementById('copyBtnText');
                 
-                navigator.clipboard.writeText(fullConfig).then(() => {{
-                    // Change button appearance
-                    btn.classList.add('copied');
-                    btnIcon.textContent = '✅';
-                    btnText.textContent = 'Copied!';
-                    
-                    // Show center popup
-                    showSuccess();
-                    
-                    // Reset button after 2 seconds
-                    setTimeout(() => {{
-                        btn.classList.remove('copied');
-                        btnIcon.textContent = '📋';
-                        btnText.textContent = 'Copy Configuration to Clipboard';
-                    }}, 2000);
-                }}).catch(err => {{
-                    // Error state
-                    btnIcon.textContent = '❌';
-                    btnText.textContent = 'Failed to copy';
-                    alert('Failed to copy: ' + err);
-                    
-                    // Reset after 3 seconds
-                    setTimeout(() => {{
-                        btnIcon.textContent = '📋';
-                        btnText.textContent = 'Copy Configuration to Clipboard';
-                    }}, 3000);
-                }});
+                try {{
+                    // Try modern Clipboard API first
+                    if (navigator.clipboard && navigator.clipboard.writeText) {{
+                        navigator.clipboard.writeText(fullConfig).then(() => {{
+                            showCopiedState(btn, btnIcon, btnText);
+                        }}).catch(err => {{
+                            // Fallback to legacy method
+                            if (copyToClipboardFallback(fullConfig)) {{
+                                showCopiedState(btn, btnIcon, btnText);
+                            }} else {{
+                                showErrorState(btn, btnIcon, btnText, err);
+                            }}
+                        }});
+                    }} else {{
+                        // Use legacy method directly
+                        if (copyToClipboardFallback(fullConfig)) {{
+                            showCopiedState(btn, btnIcon, btnText);
+                        }} else {{
+                            showErrorState(btn, btnIcon, btnText, 'Clipboard API not available');
+                        }}
+                    }}
+                }} catch (err) {{
+                    showErrorState(btn, btnIcon, btnText, err);
+                }}
+            }}
+            
+            function copyToClipboardFallback(text) {{
+                // Legacy method that works without HTTPS
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                textarea.style.top = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                
+                try {{
+                    const successful = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    return successful;
+                }} catch (err) {{
+                    document.body.removeChild(textarea);
+                    return false;
+                }}
+            }}
+            
+            function showCopiedState(btn, btnIcon, btnText) {{
+                // Change button appearance
+                btn.classList.add('copied');
+                btnIcon.textContent = '✅';
+                btnText.textContent = 'Copied!';
+                
+                // Show center popup
+                showSuccess();
+                
+                // Reset button after 2 seconds
+                setTimeout(() => {{
+                    btn.classList.remove('copied');
+                    btnIcon.textContent = '📋';
+                    btnText.textContent = 'Copy Configuration to Clipboard';
+                }}, 2000);
+            }}
+            
+            function showErrorState(btn, btnIcon, btnText, error) {{
+                // Error state
+                btnIcon.textContent = '❌';
+                btnText.textContent = 'Failed to copy';
+                console.error('Copy failed:', error);
+                
+                // Show alert with manual copy instructions
+                alert('Failed to copy automatically.\\n\\nPlease manually select and copy the configuration above.');
+                
+                // Reset after 3 seconds
+                setTimeout(() => {{
+                    btnIcon.textContent = '📋';
+                    btnText.textContent = 'Copy Configuration to Clipboard';
+                }}, 3000);
             }}
             
             function showSuccess() {{

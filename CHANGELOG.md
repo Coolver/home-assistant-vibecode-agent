@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.15] - 2025-11-08
+
+### Fixed
+- **Clipboard API error** - fixed "Cannot read properties of undefined (reading 'writeText')"
+  - Added fallback to legacy `document.execCommand('copy')` method
+  - Works in non-HTTPS contexts (Home Assistant Ingress)
+  - Graceful error handling with manual copy instructions
+  - Copy button now works reliably in all browsers
+
+### Technical
+- Implemented smart clipboard detection: tries modern API → falls back to legacy
+- Better error messages if both methods fail
+
 ## [1.0.14] - 2025-11-08
 
 ### Changed
