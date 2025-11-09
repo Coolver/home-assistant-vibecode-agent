@@ -17,6 +17,47 @@ router = APIRouter()
 
 # ==================== Helper Functions ====================
 
+async def _remove_dashboard_from_config(filename: str) -> bool:
+    """
+    Remove dashboard from configuration.yaml
+    
+    Args:
+        filename: Dashboard YAML filename
+        
+    Returns:
+        True if successfully removed, False otherwise
+    """
+    try:
+        config_path = "configuration.yaml"
+        
+        # Read current configuration as text
+        config_content = await file_manager.read_file(config_path)
+        
+        # Extract dashboard key from filename
+        dashboard_key = filename.replace('.yaml', '').replace('.yml', '')
+        
+        # Find and remove dashboard entry using regex
+        import re
+        
+        # Pattern to match dashboard entry (with proper indentation)
+        pattern = rf'    {dashboard_key}:\s*\n(?:      .*\n)+'
+        
+        if re.search(pattern, config_content):
+            new_config_content = re.sub(pattern, '', config_content)
+            
+            # Write updated configuration
+            await file_manager.write_file(config_path, new_config_content)
+            logger.info(f"Dashboard '{dashboard_key}' removed from configuration.yaml")
+            return True
+        else:
+            logger.info(f"Dashboard '{dashboard_key}' not found in configuration.yaml")
+            return False
+        
+    except Exception as e:
+        logger.error(f"Failed to remove dashboard from config: {e}")
+        return False
+
+
 async def _register_dashboard(filename: str, title: str, icon: str) -> bool:
     """
     Register dashboard in configuration.yaml
@@ -75,12 +116,13 @@ async def _register_dashboard(filename: str, title: str, icon: str) -> bool:
         
         logger.info(f"Dashboard '{dashboard_key}' registered in configuration.yaml")
         
-        # Reload Lovelace configuration
+        # Restart Home Assistant to apply configuration changes
         try:
-            await ha_client.reload_config('core')  # Need core reload for config changes
-            logger.info("Core configuration reloaded")
-        except Exception as reload_error:
-            logger.warning(f"Dashboard registered but reload failed (manual restart may be needed): {reload_error}")
+            logger.info("Restarting Home Assistant to apply dashboard registration...")
+            await ha_client.restart()
+            logger.info("Home Assistant restart initiated")
+        except Exception as restart_error:
+            logger.warning(f"Dashboard registered but restart failed (manual restart needed): {restart_error}")
         
         return True
         
@@ -323,5 +365,87 @@ async def apply_dashboard(request: ApplyDashboardRequest):
     except Exception as e:
         logger.error(f"Error applying dashboard: {e}")
         return Response(success=False, message=f"Failed to apply dashboard: {str(e)}")
+
+
+@router.delete("/delete/{filename}", response_model=Response, dependencies=[Depends(verify_token)])
+async def delete_dashboard(filename: str, remove_from_config: bool = True, create_backup: bool = True):
+    """
+    Delete a dashboard file and optionally remove from configuration.yaml
+    
+    Args:
+        filename: Dashboard filename to delete (e.g., 'ai-dashboard.yaml')
+        remove_from_config: Remove from configuration.yaml (default: true)
+        create_backup: Create Git backup before deleting (default: true)
+    
+    **⚠️ Warning:** This will permanently delete the dashboard file
+    **💾 Backup:** Creates Git backup by default
+    """
+    try:
+        logger.info(f"Deleting dashboard: {filename}")
+        
+        # Create backup if requested
+        if create_backup:
+            logger.info("Creating backup before deleting dashboard")
+            commit_msg = await git_manager.commit_changes(f"Before deleting dashboard: {filename}")
+            logger.info(f"Backup created: {commit_msg}")
+        
+        # Check if file exists
+        try:
+            await file_manager.read_file(filename)
+        except FileNotFoundError:
+            return Response(
+                success=True,
+                message=f"Dashboard {filename} does not exist",
+                data={'existed': False}
+            )
+        
+        # Delete dashboard file
+        import os
+        from pathlib import Path
+        file_path = Path('/config') / filename
+        if file_path.exists():
+            file_path.unlink()
+            logger.info(f"Dashboard file deleted: {filename}")
+        
+        # Remove from configuration.yaml if requested
+        dashboard_removed = False
+        if remove_from_config:
+            try:
+                dashboard_removed = await _remove_dashboard_from_config(filename)
+                if dashboard_removed:
+                    logger.info(f"Dashboard removed from configuration.yaml")
+            except Exception as remove_error:
+                logger.warning(f"Failed to remove dashboard from config: {remove_error}")
+        
+        # Commit changes
+        if create_backup:
+            commit_msg = f"Deleted dashboard: {filename}"
+            if dashboard_removed:
+                commit_msg += " (removed from config)"
+            await git_manager.commit_changes(commit_msg)
+        
+        # Restart HA if config was modified
+        if dashboard_removed:
+            try:
+                logger.info("Restarting Home Assistant to apply configuration changes...")
+                await ha_client.restart()
+                logger.info("Home Assistant restart initiated")
+            except Exception as restart_error:
+                logger.warning(f"Dashboard deleted but restart failed: {restart_error}")
+        
+        return Response(
+            success=True,
+            message=f"Dashboard {filename} deleted successfully",
+            data={
+                'filename': filename,
+                'removed_from_config': dashboard_removed,
+                'backup_created': create_backup,
+                'restart_initiated': dashboard_removed
+            }
+        )
+    
+    except Exception as e:
+        logger.error(f"Error deleting dashboard: {e}")
+        return Response(success=False, message=f"Failed to delete dashboard: {str(e)}")
 
 
