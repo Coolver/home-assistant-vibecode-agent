@@ -15,6 +15,66 @@ from app.services.git_manager import git_manager
 logger = logging.getLogger('ha_cursor_agent')
 router = APIRouter()
 
+# ==================== Helper Functions ====================
+
+async def _register_dashboard(filename: str, title: str, icon: str) -> bool:
+    """
+    Register dashboard in configuration.yaml
+    
+    Args:
+        filename: Dashboard YAML filename
+        title: Dashboard title
+        icon: Dashboard icon
+        
+    Returns:
+        True if successfully registered, False otherwise
+    """
+    try:
+        config_path = "configuration.yaml"
+        
+        # Read current configuration
+        config_content = await file_manager.read_file(config_path)
+        config = yaml.safe_load(config_content) or {}
+        
+        # Get or create lovelace section
+        if 'lovelace' not in config:
+            config['lovelace'] = {}
+        
+        # Ensure dashboards section exists
+        if 'dashboards' not in config['lovelace']:
+            config['lovelace']['dashboards'] = {}
+        
+        # Extract dashboard key from filename (remove .yaml)
+        dashboard_key = filename.replace('.yaml', '').replace('.yml', '')
+        
+        # Add dashboard configuration
+        config['lovelace']['dashboards'][dashboard_key] = {
+            'mode': 'yaml',
+            'title': title,
+            'icon': icon,
+            'filename': filename,
+            'show_in_sidebar': True
+        }
+        
+        # Write updated configuration
+        new_config_content = yaml.dump(config, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        await file_manager.write_file(config_path, new_config_content)
+        
+        logger.info(f"Dashboard '{dashboard_key}' registered in configuration.yaml")
+        
+        # Reload Lovelace configuration
+        try:
+            await ha_client.reload_config('lovelace')
+            logger.info("Lovelace configuration reloaded")
+        except Exception as reload_error:
+            logger.warning(f"Dashboard registered but reload failed (manual restart may be needed): {reload_error}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to register dashboard: {e}")
+        return False
+
 # ==================== Request Models ====================
 
 class GenerateDashboardRequest(BaseModel):
@@ -27,6 +87,8 @@ class ApplyDashboardRequest(BaseModel):
     """Request model for applying dashboard"""
     dashboard_config: Dict[str, Any]
     create_backup: bool = True
+    filename: str = "ai-dashboard.yaml"
+    register_dashboard: bool = True  # Automatically register in configuration.yaml
 
 # ==================== Endpoints ====================
 
@@ -198,15 +260,40 @@ async def apply_dashboard(request: ApplyDashboardRequest):
             sort_keys=False
         )
         
-        # Write to ui-lovelace.yaml
-        lovelace_path = "ui-lovelace.yaml"
+        # Write dashboard file
+        lovelace_path = request.filename
         await file_manager.write_file(lovelace_path, dashboard_yaml)
         
-        logger.info(f"Dashboard applied to {lovelace_path}")
+        logger.info(f"Dashboard written to {lovelace_path}")
+        
+        # Automatically register dashboard in configuration.yaml
+        dashboard_registered = False
+        if request.register_dashboard and lovelace_path != "ui-lovelace.yaml":
+            try:
+                dashboard_registered = await _register_dashboard(
+                    filename=lovelace_path,
+                    title=request.dashboard_config.get('title', 'AI Dashboard'),
+                    icon='mdi:creation'
+                )
+                if dashboard_registered:
+                    logger.info(f"Dashboard registered in configuration.yaml")
+            except Exception as reg_error:
+                logger.warning(f"Failed to auto-register dashboard: {reg_error}")
         
         # Commit changes
         if request.create_backup:
-            git_manager.commit("Applied generated dashboard")
+            commit_msg = f"Applied generated dashboard: {lovelace_path}"
+            if dashboard_registered:
+                commit_msg += " (auto-registered)"
+            git_manager.commit(commit_msg)
+        
+        note = 'Dashboard created successfully!'
+        if dashboard_registered:
+            note = f'✅ Dashboard auto-registered and available in sidebar! Refresh your Home Assistant UI to see it.'
+        elif lovelace_path == "ui-lovelace.yaml":
+            note = 'Refresh your Home Assistant UI to see changes. You may need to enable YAML mode in Lovelace settings.'
+        else:
+            note = f'Dashboard file created. To use it, register in configuration.yaml or use UI to add dashboard with filename: {lovelace_path}'
         
         return Response(
             success=True,
@@ -215,7 +302,8 @@ async def apply_dashboard(request: ApplyDashboardRequest):
                 'path': lovelace_path,
                 'views': len(request.dashboard_config.get('views', [])),
                 'backup_created': request.create_backup,
-                'note': 'Refresh your Home Assistant UI to see changes. You may need to enable YAML mode in Lovelace settings.'
+                'dashboard_registered': dashboard_registered,
+                'note': note
             }
         )
     
