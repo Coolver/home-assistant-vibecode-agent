@@ -92,7 +92,7 @@ class SupervisorClient:
                 }
             }
         """
-        return await self._request('GET', 'addons')
+        return await self._request('GET', 'supervisor/addons')
     
     async def get_addon_info(self, slug: str) -> Dict:
         """Get detailed information about a specific add-on
@@ -103,7 +103,7 @@ class SupervisorClient:
         Returns:
             Detailed add-on information including config, state, logs, etc.
         """
-        return await self._request('GET', f'addons/{slug}/info')
+        return await self._request('GET', f'supervisor/addons/{slug}/info')
     
     async def get_addon_logs(self, slug: str) -> str:
         """Get add-on logs
@@ -114,7 +114,7 @@ class SupervisorClient:
         Returns:
             Plain text logs
         """
-        url = f"{self.base_url}/addons/{slug}/logs"
+        url = f"{self.base_url}/supervisor/addons/{slug}/logs"
         
         try:
             async with aiohttp.ClientSession() as session:
@@ -145,7 +145,7 @@ class SupervisorClient:
         Note: This can take several minutes depending on add-on size
         """
         logger.info(f"Installing add-on: {slug}")
-        return await self._request('POST', f'addons/{slug}/install', timeout=600)
+        return await self._request('POST', f'supervisor/addons/{slug}/install', timeout=600)
     
     async def uninstall_addon(self, slug: str) -> Dict:
         """Uninstall an add-on
@@ -154,7 +154,7 @@ class SupervisorClient:
             slug: Add-on slug to uninstall
         """
         logger.info(f"Uninstalling add-on: {slug}")
-        return await self._request('POST', f'addons/{slug}/uninstall', timeout=300)
+        return await self._request('POST', f'supervisor/addons/{slug}/uninstall', timeout=300)
     
     async def start_addon(self, slug: str) -> Dict:
         """Start an add-on
@@ -163,7 +163,7 @@ class SupervisorClient:
             slug: Add-on slug to start
         """
         logger.info(f"Starting add-on: {slug}")
-        return await self._request('POST', f'addons/{slug}/start')
+        return await self._request('POST', f'supervisor/addons/{slug}/start')
     
     async def stop_addon(self, slug: str) -> Dict:
         """Stop an add-on
@@ -172,7 +172,7 @@ class SupervisorClient:
             slug: Add-on slug to stop
         """
         logger.info(f"Stopping add-on: {slug}")
-        return await self._request('POST', f'addons/{slug}/stop')
+        return await self._request('POST', f'supervisor/addons/{slug}/stop')
     
     async def restart_addon(self, slug: str) -> Dict:
         """Restart an add-on
@@ -181,7 +181,7 @@ class SupervisorClient:
             slug: Add-on slug to restart
         """
         logger.info(f"Restarting add-on: {slug}")
-        return await self._request('POST', f'addons/{slug}/restart')
+        return await self._request('POST', f'supervisor/addons/{slug}/restart')
     
     async def update_addon(self, slug: str) -> Dict:
         """Update an add-on to latest version
@@ -190,7 +190,7 @@ class SupervisorClient:
             slug: Add-on slug to update
         """
         logger.info(f"Updating add-on: {slug}")
-        return await self._request('POST', f'addons/{slug}/update', timeout=600)
+        return await self._request('POST', f'supervisor/addons/{slug}/update', timeout=600)
     
     # ==================== Add-on Configuration ====================
     
@@ -217,13 +217,13 @@ class SupervisorClient:
             Update result
         """
         logger.info(f"Configuring add-on {slug}: {options}")
-        return await self._request('POST', f'addons/{slug}/options', data={'options': options})
+        return await self._request('POST', f'supervisor/addons/{slug}/options', data={'options': options})
     
     # ==================== Store & Repositories ====================
     
     async def list_repositories(self) -> Dict:
         """Get list of add-on repositories"""
-        return await self._request('GET', 'store/repositories')
+        return await self._request('GET', 'supervisor/store/repositories')
     
     async def add_repository(self, repository_url: str) -> Dict:
         """Add a custom add-on repository
@@ -232,7 +232,7 @@ class SupervisorClient:
             repository_url: URL of repository to add
         """
         logger.info(f"Adding repository: {repository_url}")
-        return await self._request('POST', 'store/repositories', data={'repository': repository_url})
+        return await self._request('POST', 'supervisor/store/repositories', data={'repository': repository_url})
     
     async def remove_repository(self, repository_slug: str) -> Dict:
         """Remove an add-on repository
@@ -241,7 +241,7 @@ class SupervisorClient:
             repository_slug: Slug of repository to remove
         """
         logger.info(f"Removing repository: {repository_slug}")
-        return await self._request('DELETE', f'store/repositories/{repository_slug}')
+        return await self._request('DELETE', f'supervisor/store/repositories/{repository_slug}')
 
 # Global Supervisor client instance
 supervisor_client = SupervisorClient()

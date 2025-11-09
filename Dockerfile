@@ -1,7 +1,7 @@
 ARG BUILD_FROM
 FROM ${BUILD_FROM}
 
-# Version: 2.3.3 - Fix duplicate router prefix
+# Version: 2.3.4 - Fix Supervisor API endpoints
 # Install system dependencies
 RUN apk add --no-cache \
     git \

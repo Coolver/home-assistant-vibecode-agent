@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.4] - 2025-11-09
+
+### 🐛 Critical Bug Fix
+
+**Supervisor API Endpoint Fix:**
+- ✅ Fixed all Supervisor API endpoints to use correct `/supervisor/` prefix
+- ✅ Changed from `http://supervisor/addons` to `http://supervisor/supervisor/addons`
+- ✅ All add-on management operations now work correctly
+
+**What was wrong:**
+- All endpoints were missing the `/supervisor/` prefix
+- Resulted in 403 Forbidden errors from Supervisor API
+- Supervisor API requires: `http://supervisor/supervisor/{endpoint}`
+
+**Fixed endpoints:**
+- ✅ `supervisor/addons` (list all)
+- ✅ `supervisor/addons/{slug}/info` (get info)
+- ✅ `supervisor/addons/{slug}/logs` (get logs)
+- ✅ `supervisor/addons/{slug}/install` (install)
+- ✅ `supervisor/addons/{slug}/uninstall` (uninstall)
+- ✅ `supervisor/addons/{slug}/start` (start)
+- ✅ `supervisor/addons/{slug}/stop` (stop)
+- ✅ `supervisor/addons/{slug}/restart` (restart)
+- ✅ `supervisor/addons/{slug}/update` (update)
+- ✅ `supervisor/addons/{slug}/options` (configure)
+- ✅ `supervisor/store/repositories` (repositories)
+
+**Impact:**
+- All add-on management endpoints now return correct data instead of 403 errors
+- Full add-on lifecycle management now functional ✅
+
 ## [2.3.3] - 2025-11-09
 
 ### 🐛 Critical Bug Fix
