@@ -208,74 +208,6 @@
             background: #22201c;
         }
         
-        .advanced {
-            margin-top: 12px;
-        }
-        
-        .advanced-toggle {
-            background: transparent;
-            border: 1px solid #30363d;
-            color: #8b949e;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            width: 100%;
-            text-align: left;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            transition: all 0.2s;
-        }
-        
-        .advanced-toggle:hover {
-            background: #161b22;
-            border-color: #58a6ff;
-            color: #c9d1d9;
-        }
-        
-        .advanced-content {
-            display: none;
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid #30363d;
-        }
-        
-        .advanced-content.show {
-            display: block;
-        }
-        
-        .key-display {
-            background: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            padding: 12px 16px;
-            font-family: 'SF Mono', Monaco, monospace;
-            font-size: 13px;
-            color: #79c0ff;
-            margin: 12px 0;
-            word-break: break-all;
-        }
-        
-        .btn-secondary {
-            background: #21262d;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s;
-            text-decoration: none;
-        }
-        
-        .btn-secondary:hover {
-            background: #30363d;
-        }
-        
         .success-message {
             position: fixed;
             top: 50%;
@@ -314,14 +246,6 @@
                 opacity: 1;
             }
         }
-        
-        .chevron {
-            transition: transform 0.2s;
-        }
-        
-        .chevron.rotate {
-            transform: rotate(180deg);
-        }
     </style>
 </head>
 <body>
@@ -340,6 +264,10 @@
             <p style="color: #8b949e; margin-bottom: 16px;">
                 This is your complete Cursor MCP configuration.
             </p>
+            
+            <div class="info-box warning" style="margin-bottom: 16px;">
+                <strong>⚠️ Security Notice:</strong> This configuration contains your Agent Key. Keep it safe and never commit it to public repositories!
+            </div>
             
             <div class="config-block">
                 <pre id="configText">{{ json_config }}</pre>
@@ -392,45 +320,6 @@
         </div>
         
         <div class="card">
-            <h2>💡 Additional Info</h2>
-            
-            <div class="info-box">
-                <strong>🔒 Security:</strong> Your Agent Key is used to authenticate with this agent.
-            </div>
-            
-            <div class="info-box warning">
-                <strong>⚠️ Keep your key safe:</strong> Don't share it publicly or commit to git repositories.
-            </div>
-            
-            <div class="advanced">
-                <button class="advanced-toggle" onclick="toggleAdvanced()">
-                    <span>🔧 Advanced: View/Regenerate Agent Key</span>
-                    <span class="chevron" id="chevron">▼</span>
-                </button>
-                
-                <div class="advanced-content" id="advancedContent">
-                    <h3 style="color: #c9d1d9; font-size: 16px; margin-bottom: 12px;">Your Agent Key:</h3>
-                    <div class="key-display" id="keyDisplay">{{ masked_key }}</div>
-                    
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button class="btn-secondary" onclick="toggleKeyVisibility()">
-                            <span id="eyeIcon">👁️</span> <span id="toggleText">Show Full Key</span>
-                        </button>
-                    </div>
-                    
-                    <div class="info-box warning" style="margin-top: 16px; font-size: 13px;">
-                        <strong>⚠️ Regenerating the key:</strong> Your current Cursor configuration will stop working. You'll need to update ~/.cursor/mcp.json with the new key.
-                    </div>
-                    
-                    <p style="color: #8b949e; font-size: 13px; margin-top: 12px;">
-                        <strong>File location:</strong> <code>/config/.ha_cursor_agent_key</code><br>
-                        <strong>To regenerate manually:</strong> Delete the file above and restart the add-on.
-                    </p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
             <h2>📚 Resources</h2>
             <ul style="margin-left: 20px; color: #8b949e;">
                 <li><a href="/docs" target="_blank" style="color: #58a6ff; text-decoration: none;">API Documentation</a></li>
@@ -447,8 +336,6 @@
     <script>
         let fullConfig = `{{ json_config }}`;
         let fullKey = "{{ api_key }}";
-        let maskedKey = "{{ masked_key }}";
-        let keyVisible = false;
         
         function copyConfig() {
             const btn = document.getElementById('copyBtn');
@@ -543,30 +430,6 @@
             }, 2000);
         }
         
-        function toggleAdvanced() {
-            const content = document.getElementById('advancedContent');
-            const chevron = document.getElementById('chevron');
-            content.classList.toggle('show');
-            chevron.classList.toggle('rotate');
-        }
-        
-        function toggleKeyVisibility() {
-            const display = document.getElementById('keyDisplay');
-            const toggleText = document.getElementById('toggleText');
-            const eyeIcon = document.getElementById('eyeIcon');
-            keyVisible = !keyVisible;
-            
-            if (keyVisible) {
-                display.textContent = fullKey;
-                toggleText.textContent = 'Hide Full Key';
-                eyeIcon.textContent = '🙈';
-            } else {
-                display.textContent = maskedKey;
-                toggleText.textContent = 'Show Full Key';
-                eyeIcon.textContent = '👁️';
-            }
-        }
-        
         function confirmRegenerate() {
             if (confirm('⚠️ Regenerate API Key?\\n\\nThis will invalidate your current key. Your Cursor configuration will stop working until you update ~/.cursor/mcp.json with the new key.\\n\\nContinue?')) {
                 regenerateKey();
@@ -615,10 +478,6 @@
                     fullConfig = newConfig;
                     document.getElementById('configText').textContent = newConfig;
                     
-                    // Update masked key display
-                    const newMasked = result.new_key.substring(0, 12) + '...' + result.new_key.substring(result.new_key.length - 12);
-                    document.getElementById('keyDisplay').textContent = keyVisible ? result.new_key : newMasked;
-                    maskedKey = newMasked;
                     
                     // Show success
                     icon.textContent = '✅';
@@ -665,4 +524,5 @@
     </script>
 </body>
 </html>
+
 

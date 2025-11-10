@@ -130,3 +130,4 @@ ha_apply_dashboard({
 - ✅ Agent only applies (simple, reliable)
 - ✅ User gets custom dashboard, not template
 
+

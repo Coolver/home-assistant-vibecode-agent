@@ -2,57 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.5.0] - 2025-11-09
-
-### 🎯 MAJOR REFACTOR: AI-Driven Dashboard Generation
-
-**Architectural change from server-side templates to intelligent AI-driven creation!**
-
-**What Changed:**
-- ❌ REMOVED: Server-side LovelaceGenerator (rigid templates)
-- ❌ REMOVED: POST /api/lovelace/generate endpoint  
-- ✅ UPDATED: GET /api/lovelace/analyze (returns full entity data for AI)
-- ✅ ADDED: Conversational workflow in AI Instructions (+200 lines)
-- ✅ ADDED: Dashboard generation guidelines for AI
-- ✅ ADDED: YAMLEditor utility for safe YAML operations
-- ✅ ADDED: Auto-rollback function for error recovery
-
-**New Architecture:**
-1. User asks for dashboard with requirements
-2. AI asks clarifying questions (conversational!)
-3. AI analyzes entities via ha_analyze_entities_for_dashboard
-4. AI generates custom YAML in Cursor (intelligent!)
-5. AI proposes structure to user
-6. User approves
-7. AI applies via ha_apply_dashboard
-
-**Benefits:**
-- ✅ AI understands context ("climate-focused", "minimal", "for bedroom")
-- ✅ Conversational dashboard creation
-- ✅ Custom layouts per user needs, not rigid templates
-- ✅ AI proposes before creating
-- ✅ Flexible and intelligent
-
-**Example Dialog:**
-```
-User: "Create climate dashboard"
-AI: "I see 7 TRVs. Focus on these? Monitor batteries too?"
-User: "Yes"
-AI: *generates custom YAML* *proposes* *applies*
-✅ Personalized dashboard!
-```
-
-**Changes:**
-- DELETED: app/services/lovelace_generator.py (-430 lines)
-- app/api/lovelace.py: removed generate, simplified analyze
-- app/api/ai_instructions.py: added dashboard workflow (+200 lines)
-- app/utils/yaml_editor.py: NEW - safe YAML editing utility
-
 ## [2.7.0] - 2025-11-10
 
-### 🏗️ REFACTOR: AI Instructions → Markdown Files
+### 🏗️ MAJOR REFACTOR: Architecture Improvements
 
-**MAJOR: Modular AI Instructions architecture!**
+**Two major internal refactors for better maintainability!**
+
+#### Part 1: AI Instructions → Markdown Files
 
 **Before:**
 - ai_instructions.py: 1295 lines (giant Python string)
@@ -61,9 +17,9 @@ AI: *generates custom YAML* *proposes* *applies*
 **After:**
 - ai_instructions.py: 34 lines (loader only!)
 - 7 modular Markdown files by topic
-- Easy to maintain and update
+- Dynamic loader combines files
 
-**New Structure:**
+**Structure:**
 ```
 app/ai_instructions/
 ├── __init__.py (loader)
@@ -78,15 +34,35 @@ app/ai_instructions/
 ```
 
 **Benefits:**
-- ✅ Markdown syntax (easy editing, GitHub preview)
+- ✅ Markdown (easy editing, GitHub preview, syntax highlighting)
 - ✅ Modular (update sections independently)
-- ✅ Reusable (can export for docs)
 - ✅ Version dynamically injected
 - ✅ 97% code reduction
 
+#### Part 2: Ingress Panel → Jinja2 Template
+
+**Before:**
+- ingress_panel.py: 715 lines (HTML in Python string)
+- Hard to edit HTML, no syntax highlighting
+
+**After:**
+- ingress_panel.py: 52 lines (clean loader)
+- app/templates/ingress_panel.html: Jinja2 template
+- requirements.txt: added jinja2
+
+**Benefits:**
+- ✅ HTML syntax highlighting
+- ✅ Separation of concerns (logic vs presentation)
+- ✅ Easy UI editing
+- ✅ 93% code reduction in Python
+
+#### Summary
+
 **Git Stats:**
-- +616 insertions, -1270 deletions
-- Net: -654 lines removed
+- ai_instructions.py: 1295 → 34 lines (-97%)
+- ingress_panel.py: 715 → 52 lines (-93%)
+- Total: ~2200 lines cleaned up
+- Better code organization, same functionality
 
 **Version:** 2.7.0 (MINOR - internal refactor, API unchanged)
 

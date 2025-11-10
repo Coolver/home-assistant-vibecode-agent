@@ -26,3 +26,4 @@ This guide provides comprehensive instructions for AI assistants (like Cursor AI
 **View Logs:** `GET /api/logs/`  
 **Interactive API Docs:** http://homeassistant.local:8099/docs
 
+

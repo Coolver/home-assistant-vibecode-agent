@@ -69,3 +69,4 @@ AI: [calls ha_analyze_entities_for_dashboard without explanation]
 - `ha_get_logs` (when user asks for logs)
 - `ha_get_entity_state` (checking specific entity)
 
+
