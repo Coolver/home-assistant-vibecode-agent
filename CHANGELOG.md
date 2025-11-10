@@ -48,6 +48,97 @@ AI: *generates custom YAML* *proposes* *applies*
 - app/api/ai_instructions.py: added dashboard workflow (+200 lines)
 - app/utils/yaml_editor.py: NEW - safe YAML editing utility
 
+## [2.6.1] - 2025-11-10
+
+### 📚 Documentation: Complete Reference Update
+
+**Updated all remaining old package references:**
+- app/main.py: old ingress panel package name
+- app/ingress_panel.py: NPM package link
+- CHANGELOG.md: complete history for v2.5.x-2.6.x
+
+**Version:** 2.6.1
+
+## [2.6.0] - 2025-11-10
+
+### 📦 BREAKING: MCP Package Renamed
+
+**MCP package renamed for consistency with GitHub repository!**
+
+**Old:** `@coolver/mcp-home-assistant`  
+**New:** `@coolver/home-assistant-mcp`
+
+**Migration Required:**
+Users must update `~/.cursor/mcp.json`:
+```json
+{
+  "mcpServers": {
+    "home-assistant": {
+      "command": "npx",
+      "args": ["-y", "@coolver/home-assistant-mcp@latest"],
+      ...
+    }
+  }
+}
+```
+
+**Changes:**
+- app/ingress_panel.py: updated npx command to new package
+- app/main.py: updated all package references
+- README.md: updated NPM badge and links
+- CHANGELOG.md: updated historical links
+
+**Why:**
+- Consistency with GitHub repo (home-assistant-mcp)
+- Development stage (no existing users affected)
+- Clearer naming convention
+
+**MCP Package Changes (v3.0.x):**
+- Package name: @coolver/mcp-home-assistant → @coolver/home-assistant-mcp
+- SDK upgraded: 0.5.0 → 1.21.1 (API compatibility)
+- Repository: github.com/Coolver/home-assistant-mcp
+- All documentation updated
+
+## [2.5.4] - 2025-11-10
+
+### 🐛 Bug Fix: API Key Regeneration
+
+**Fixed 404 error when regenerating API key via ingress panel:**
+- Fixed: fetch('/api/regenerate-key') → fetch('api/regenerate-key')
+- Relative URL works through ingress proxy correctly
+- Improved JavaScript error handling
+
+## [2.5.3] - 2025-11-10
+
+### ✨ Feature: API Key Regeneration Button
+
+**Added working "Regenerate Key" button in UI:**
+- Button placed next to "Copy Configuration"
+- POST /api/regenerate-key endpoint
+- One-click key regeneration
+- Auto-updates config display with new key
+- Alerts user to update Cursor
+
+## [2.5.2] - 2025-11-10
+
+### 📖 Documentation: Communication Guidelines
+
+**Added AI communication guidelines:**
+- "Explain Before Executing" section
+- AI explains plan before calling tools
+- Better transparency and user understanding
+- Exception for simple read-only checks
+
+## [2.5.1] - 2025-11-10
+
+### 📖 Documentation: Output Formatting
+
+**Added output formatting guidelines for AI:**
+- Format MCP tool output for readability
+- Don't show raw JSON to users
+- Use emojis and tables for clarity
+- Show key information, hide implementation details
+
 ## [2.4.7] - 2025-11-09
 
 ### 🛠️ Improvements: YAMLEditor Utility + Error Handling
@@ -1017,7 +1108,7 @@ Old HA tokens will no longer work (this is intentional for security).
 
 ### Changed
 - **Updated documentation for MCP integration** - New recommended way to connect Cursor AI
-- Added link to [@coolver/mcp-home-assistant](https://www.npmjs.com/package/@coolver/mcp-home-assistant) NPM package
+- Added link to [@coolver/home-assistant-mcp](https://www.npmjs.com/package/@coolver/home-assistant-mcp) NPM package (formerly @coolver/mcp-home-assistant)
 - Simplified connection instructions using Model Context Protocol
 - Updated README with MCP badge and links
 

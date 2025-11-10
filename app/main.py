@@ -23,7 +23,7 @@ LOG_LEVEL = os.getenv('LOG_LEVEL', 'info').upper()
 logger = setup_logger('ha_cursor_agent', LOG_LEVEL)
 
 # Agent version
-AGENT_VERSION = "2.6.0"
+AGENT_VERSION = "2.6.1"
 
 # FastAPI app
 app = FastAPI(
@@ -522,7 +522,7 @@ async def old_ingress_panel():
   "mcpServers": {{
     "home-assistant": {{
       "command": "npx",
-      "args": ["-y", "@coolver/mcp-home-assistant@latest"],
+      "args": ["-y", "@coolver/home-assistant-mcp@latest"],
       "env": {{
         "HA_AGENT_URL": "http://homeassistant.local:8099",
         "HA_AGENT_KEY": "YOUR_API_KEY_HERE"
@@ -573,7 +573,7 @@ async def old_ingress_panel():
                 <ul style="margin-left: 20px;">
                     <li><a href="/docs" target="_blank">API Documentation</a></li>
                     <li><a href="https://github.com/Coolver/home-assistant-cursor-agent" target="_blank">GitHub Repository</a></li>
-                    <li><a href="https://www.npmjs.com/package/@coolver/mcp-home-assistant" target="_blank">MCP Package</a></li>
+                    <li><a href="https://www.npmjs.com/package/@coolver/home-assistant-mcp" target="_blank">MCP Package</a></li>
                 </ul>
             </div>
         </div>

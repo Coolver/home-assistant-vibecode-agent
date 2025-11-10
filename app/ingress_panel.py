@@ -479,7 +479,7 @@ def generate_ingress_html(api_key: str, agent_version: str) -> str:
                 <ul style="margin-left: 20px; color: #8b949e;">
                     <li><a href="/docs" target="_blank" style="color: #58a6ff; text-decoration: none;">API Documentation</a></li>
                     <li><a href="https://github.com/Coolver/home-assistant-cursor-agent" target="_blank" style="color: #58a6ff; text-decoration: none;">GitHub Repository</a></li>
-                    <li><a href="https://www.npmjs.com/package/@coolver/mcp-home-assistant" target="_blank" style="color: #58a6ff; text-decoration: none;">MCP Package</a></li>
+                    <li><a href="https://www.npmjs.com/package/@coolver/home-assistant-mcp" target="_blank" style="color: #58a6ff; text-decoration: none;">MCP Package</a></li>
                 </ul>
             </div>
         </div>
