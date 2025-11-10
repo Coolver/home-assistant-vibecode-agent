@@ -2,6 +2,65 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.3] - 2025-11-10
+
+### ✨ Feature: Dashboard Validation + Detailed Errors
+
+**Comprehensive dashboard validation and better error reporting!**
+
+**Part 1: Dashboard Filename Validation**
+- Validates filename contains hyphen (HA requirement)
+- Checks for spaces, uppercase
+- Returns helpful suggestions
+- Prevents common mistakes
+
+**Validation Rules:**
+```
+❌ BAD:  "heating", "stat", "climate" (no hyphen)
+✅ GOOD: "heating-now", "climate-control"
+
+Auto-suggestions:
+"stat" → "stat-dashboard"
+"Heating Now" → "heating-now" (kebab-case)
+```
+
+**Part 2: Pre-Creation Checks**
+- AI checks if dashboard already exists
+- Warns before overwriting
+- Validates filename before backup (fail fast)
+
+**Part 3: Detailed Configuration Errors**
+- check_config returns detailed errors like Developer Tools
+- Shows line numbers and specific issues
+- Extracts error messages from HA API
+- Much better debugging
+
+**AI Instructions Updated:**
+- Added STEP 0: Pre-Creation Checks (mandatory)
+- Dashboard name validation rules
+- Examples and auto-conversion logic
+
+**Before:**
+```
+Error: "Configuration has errors: 500 Server Error"
+```
+
+**After:**
+```
+Error: "Configuration invalid!
+
+Invalid config for 'lovelace' at configuration.yaml, line 342: 
+Url path needs to contain a hyphen (-) for dictionary value..."
+```
+
+**Impact:**
+- ✅ Prevents invalid dashboard names
+- ✅ Better error messages for debugging
+- ✅ AI can understand and fix issues
+- ✅ Fewer failed dashboard creations
+
+**Version:** 2.7.3 (PATCH - validation improvements)
+
 ## [2.7.2] - 2025-11-10
 
 ### 🐛 Bug Fix: File List Root Directory
