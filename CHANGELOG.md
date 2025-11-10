@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.1] - 2025-11-10
+
+### 🎨 UI/UX: Ingress Panel Improvements
+
+**Improved Ingress Panel usability:**
+
+**Changes:**
+- Security warning moved to Step 1 (more visible)
+- Removed duplicate "Additional Info" section
+- Removed redundant Advanced key visibility toggle
+- Cleaned up unused CSS and JavaScript
+- Simplified UI - only essential elements
+
+**Code Cleanup:**
+- Removed unused CSS: .advanced, .key-display, .btn-secondary, .chevron
+- Removed unused JS: toggleAdvanced(), toggleKeyVisibility()
+- Removed unused variables: masked_key, keyVisible
+- Template simplified: 3 variables instead of 4
+
+**CHANGELOG:**
+- Fixed duplicate v2.7.0 entry
+- Combined refactor notes properly
+
+**Result:**
+- Cleaner, simpler UI
+- Better security notice placement
+- Less code, same functionality
+
+**Version:** 2.7.1 (PATCH - UI improvements)
+
 ## [2.7.0] - 2025-11-10
 
 ### 🏗️ MAJOR REFACTOR: Architecture Improvements
