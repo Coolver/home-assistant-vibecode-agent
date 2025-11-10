@@ -21,7 +21,7 @@ No more manual YAML editing or searching through documentation - just describe w
 
 ## 🎯 What is this?
 
-**HA Cursor Agent** is a Home Assistant Add-on that provides a **REST API** enabling AI assistants (like Cursor AI via [MCP protocol](https://github.com/Coolver/mcp-home-assistant)) to:
+**HA Cursor Agent** is a Home Assistant Add-on that provides a **REST API** enabling AI assistants (like Cursor AI via [MCP protocol](https://github.com/Coolver/home-assistant-mcp)) to:
 
 ### 🔍 Analyze Your Setup
 ✅ **Read entire configuration** - entities, automations, scripts, helpers  
@@ -226,7 +226,7 @@ Cursor AI will autonomously read your configuration, create components, and depl
 
 **That's it!** Cursor AI will use the MCP protocol to communicate with your Home Assistant.
 
-**Learn more:** [MCP Home Assistant on GitHub](https://github.com/Coolver/mcp-home-assistant) | [NPM Package](https://www.npmjs.com/package/@coolver/mcp-home-assistant)
+**Learn more:** [MCP Home Assistant on GitHub](https://github.com/Coolver/home-assistant-mcp) | [NPM Package](https://www.npmjs.com/package/@coolver/mcp-home-assistant)
 
 ### Real-World Examples
 
@@ -262,7 +262,7 @@ find the problem, and fix it.
 
 ### What Cursor AI Can Do
 
-With this add-on and [MCP integration](https://github.com/Coolver/mcp-home-assistant), Cursor AI can:
+With this add-on and [MCP integration](https://github.com/Coolver/home-assistant-mcp), Cursor AI can:
 
 ✅ **Analyze YOUR configuration** - detects your actual devices and entities  
 ✅ **Create complex systems autonomously** - 10+ interconnected automations  
