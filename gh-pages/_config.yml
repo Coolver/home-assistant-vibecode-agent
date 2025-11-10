@@ -1,0 +1,45 @@
+# GitHub Pages Configuration
+title: "From AI vision systems to DIY home heating"
+description: "How I built a multi-zone heating controller and a Home Assistant Agent + MCP for Cursor."
+author: Vlad
+
+# Theme
+theme: jekyll-theme-cayman
+remote_theme: pages-themes/cayman@v0.2.0
+
+# Plugins
+plugins:
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+
+# Markdown
+markdown: kramdown
+highlighter: rouge
+
+# Relative links
+relative_links:
+  enabled: true
+  collections: false
+
+# SEO and sharing
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: default
+      image: /assets/preview.png
+      author: Vlad
+
+# Exclude from processing
+exclude:
+  - app/
+  - build.json
+  - Dockerfile
+  - requirements.txt
+  - run.sh
+  - "*.py"
+  - "*.yaml"
+  - LICENSE
+  - .gitignore
+
