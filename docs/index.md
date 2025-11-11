@@ -1,9 +1,9 @@
 ---
 layout: default
-title: "From AI vision systems to DIY home heating"
+title: "Cursor agent for Home Assistant"
 ---
 
-# From AI vision systems to DIY home heating — I needed a break, so I built this
+# I just wanted to fix my heating, but ended up building a Cursor agent for Home Assistant
 
 After several weeks of working on AI systems that give vision to autonomous agents,  
 I decided I needed a short break.
