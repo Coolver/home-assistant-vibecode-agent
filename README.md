@@ -1,6 +1,6 @@
 # HA Cursor Agent - Home Assistant Add-on
 
-[![Version](https://img.shields.io/badge/version-2.7.9-blue.svg)](https://github.com/Coolver/home-assistant-cursor-agent)
+[![Version](https://img.shields.io/badge/version-2.7.10-blue.svg)](https://github.com/Coolver/home-assistant-cursor-agent)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![MCP Package](https://img.shields.io/npm/v/@coolver/home-assistant-mcp?label=MCP%20Package)](https://www.npmjs.com/package/@coolver/home-assistant-mcp)
 

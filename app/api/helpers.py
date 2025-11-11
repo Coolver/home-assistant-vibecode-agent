@@ -73,10 +73,9 @@ async def create_helper(helper: HelperCreate):
     **Example request (Boolean):**
     ```json
     {
-      "domain": "input_boolean",
-      "entity_id": "my_switch",
-      "name": "My Switch",
+      "type": "input_boolean",
       "config": {
+        "name": "My Switch",
         "icon": "mdi:toggle-switch",
         "initial": false
       }
@@ -86,10 +85,9 @@ async def create_helper(helper: HelperCreate):
     **Example request (Number):**
     ```json
     {
-      "domain": "input_number",
-      "entity_id": "my_number",
-      "name": "My Number",
+      "type": "input_number",
       "config": {
+        "name": "My Number",
         "min": 0,
         "max": 100,
         "step": 5,
@@ -100,29 +98,35 @@ async def create_helper(helper: HelperCreate):
     ```
     """
     try:
-        # Construct service data
-        service_data = {
-            "name": helper.name,
-            **helper.config
-        }
+        # Validate helper type
+        valid_types = ['input_boolean', 'input_text', 'input_number', 'input_datetime', 'input_select']
+        if helper.type not in valid_types:
+            raise HTTPException(status_code=400, detail=f"Invalid helper type. Must be one of: {', '.join(valid_types)}")
+        
+        # Extract name from config (required)
+        if 'name' not in helper.config:
+            raise HTTPException(status_code=400, detail="config must include 'name' field")
         
         # Create helper via service call
         # Note: This creates the helper in the UI, not in YAML
         result = await ha_client.call_service(
-            helper.domain,
+            helper.type,
             'create',
-            service_data
+            helper.config
         )
         
-        # Commit changes
-        if git_manager.enabled:
-            await git_manager.commit_changes(f"Create helper: {helper.domain}.{helper.entity_id}")
+        # Get entity_id from result (HA returns it)
+        entity_id = result.get('entity_id') if isinstance(result, dict) else None
         
-        logger.info(f"Created helper: {helper.domain}.{helper.entity_id}")
+        # Commit changes
+        if git_manager.enabled and entity_id:
+            await git_manager.commit_changes(f"Create helper: {entity_id}")
+        
+        logger.info(f"Created helper: {helper.type} - {helper.config.get('name')}")
         
         return Response(
             success=True,
-            message=f"Helper created: {helper.domain}.{helper.entity_id}",
+            message=f"Helper created: {helper.type}",
             data=result
         )
     except Exception as e:

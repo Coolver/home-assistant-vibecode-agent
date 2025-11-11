@@ -15,10 +15,8 @@ class FileAppend(BaseModel):
 
 class HelperCreate(BaseModel):
     """Helper creation model"""
-    domain: str = Field(..., description="Helper domain: input_boolean, input_text, input_number, input_datetime, input_select")
-    entity_id: str = Field(..., description="Entity ID without domain (e.g., 'my_helper')")
-    name: str
-    config: Dict[str, Any] = Field(..., description="Helper-specific configuration")
+    type: str = Field(..., description="Helper type: input_boolean, input_text, input_number, input_datetime, input_select")
+    config: Dict[str, Any] = Field(..., description="Helper configuration including 'name' and other options")
 
 class AutomationData(BaseModel):
     """Automation data model"""
