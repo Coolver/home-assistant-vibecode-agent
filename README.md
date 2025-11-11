@@ -11,6 +11,8 @@ Transform your smart home management! This add-on enables Cursor AI to:
 
 No more manual YAML editing or searching through documentation - just describe what you want in natural language!
 
+[![Watch the demo](https://img.youtube.com/vi/xocbWonWdoc/hqdefault.jpg)](https://youtu.be/xocbWonWdoc "Watch the demo on YouTube")
+
 **Real example:** User says *"Install smart climate control"* → AI analyzes 7 TRVs, creates 10 automations + 9 helpers + 10 sensors + 5 scripts, deploys everything, and it just works!
 
 [![Version](https://img.shields.io/badge/version-2.7.7-blue.svg)](https://github.com/Coolver/home-assistant-cursor-agent)
