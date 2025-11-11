@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.6] - 2025-11-11
+
+### 🐛 Fix: Conditional Cards Guide - Corrected Structure
+
+**Fixed incorrect conditional card patterns in AI instructions**
+
+**What was wrong in v2.7.5:**
+```yaml
+# ❌ WRONG - Missing "condition: state"
+type: conditional
+conditions:
+  - entity: climate.office_trv
+    state: "heat"
+```
+
+**Corrected in v2.7.6:**
+```yaml
+# ✅ CORRECT - Must include "condition: state"
+type: conditional
+conditions:
+  - condition: state
+    entity: sensor.office_trv_hvac_action
+    state: heating
+```
+
+**Key fixes:**
+1. ✅ Added `condition: state` requirement (most common mistake!)
+2. ✅ Corrected to use template sensors for hvac_action attributes
+3. ✅ Fixed state value: `heating` not "heat"
+4. ✅ Added `condition: numeric_state` for numeric comparisons
+5. ✅ Updated all examples with correct structure
+6. ✅ Based on actual working commit: e8ed8a3b
+
+**Reference:** Commit e8ed8a3b - "Before deleting dashboard: heating-now.yaml" (the working version)
+
+**Impact:**
+- AI will now generate correct conditional cards
+- Prevents common YAML structure mistakes
+- Template sensors properly documented
+- Real-world tested patterns
+
+**Version:** 2.7.6 (PATCH - documentation fix)
+
 ## [2.7.5] - 2025-11-11
 
 ### 📚 Documentation: Conditional Cards Guide
