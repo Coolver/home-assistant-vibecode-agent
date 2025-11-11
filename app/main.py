@@ -23,7 +23,7 @@ LOG_LEVEL = os.getenv('LOG_LEVEL', 'info').upper()
 logger = setup_logger('ha_cursor_agent', LOG_LEVEL)
 
 # Agent version
-AGENT_VERSION = "2.7.10"
+AGENT_VERSION = "2.8.0"
 
 # FastAPI app
 app = FastAPI(

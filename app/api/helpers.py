@@ -4,6 +4,7 @@ import logging
 
 from app.models.schemas import HelperCreate, Response
 from app.services.ha_client import ha_client
+from app.services.ha_websocket import get_ws_client
 from app.services.git_manager import git_manager
 
 router = APIRouter()
@@ -107,26 +108,27 @@ async def create_helper(helper: HelperCreate):
         if 'name' not in helper.config:
             raise HTTPException(status_code=400, detail="config must include 'name' field")
         
-        # Create helper via service call
-        # Note: This creates the helper in the UI, not in YAML
-        result = await ha_client.call_service(
+        # Create helper via WebSocket (works better than REST for helpers)
+        ws_client = await get_ws_client()
+        result = await ws_client.call_service(
             helper.type,
             'create',
             helper.config
         )
         
-        # Get entity_id from result (HA returns it)
-        entity_id = result.get('entity_id') if isinstance(result, dict) else None
+        # Get entity_id from result (HA returns it in context)
+        entity_id = result.get('context', {}).get('id') if isinstance(result, dict) else None
+        helper_name = helper.config.get('name')
         
         # Commit changes
-        if git_manager.enabled and entity_id:
-            await git_manager.commit_changes(f"Create helper: {entity_id}")
+        if git_manager.enabled:
+            await git_manager.commit_changes(f"Create helper: {helper.type} - {helper_name}")
         
-        logger.info(f"Created helper: {helper.type} - {helper.config.get('name')}")
+        logger.info(f"Created helper: {helper.type} - {helper_name}")
         
         return Response(
             success=True,
-            message=f"Helper created: {helper.type}",
+            message=f"Helper created: {helper.type} - {helper_name}",
             data=result
         )
     except Exception as e:
@@ -145,10 +147,11 @@ async def delete_helper(entity_id: str):
         # Get domain from entity_id
         domain = entity_id.split('.')[0]
         
-        # Delete via service
-        await ha_client.call_service(
+        # Delete via WebSocket
+        ws_client = await get_ws_client()
+        result = await ws_client.call_service(
             domain,
-            'delete',
+            'remove',
             {"entity_id": entity_id}
         )
         
@@ -156,7 +159,8 @@ async def delete_helper(entity_id: str):
         
         return Response(
             success=True,
-            message=f"Helper deleted: {entity_id}"
+            message=f"Helper deleted: {entity_id}",
+            data=result
         )
     except Exception as e:
         logger.error(f"Failed to delete helper: {e}")
