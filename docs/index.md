@@ -3,7 +3,7 @@ layout: default
 title: "Cursor agent for Home Assistant"
 ---
 
-# I just wanted to fix my heating, but ended up building a Cursor agent for Home Assistant
+# I just wanted to fix my heating, but built a Cursor agent for Home Assistant
 
 After several weeks of working on AI systems that give vision to autonomous agents,  
 I decided I needed a short break.
