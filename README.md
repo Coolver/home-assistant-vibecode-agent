@@ -691,23 +691,37 @@ home-assistant-cursor-agent/
 ├── requirements.txt         # Python dependencies
 ├── app/
 │   ├── main.py             # FastAPI application
+│   ├── auth.py             # API authentication
+│   ├── ingress_panel.py    # Web UI panel
 │   ├── api/                # API endpoints
-│   │   ├── files.py
-│   │   ├── entities.py
-│   │   ├── helpers.py
-│   │   ├── automations.py
-│   │   ├── scripts.py
-│   │   ├── system.py
-│   │   ├── backup.py
-│   │   └── logs.py
+│   │   ├── files.py        # File operations
+│   │   ├── entities.py     # Entity states
+│   │   ├── helpers.py      # Helper management
+│   │   ├── automations.py  # Automation CRUD
+│   │   ├── scripts.py      # Script CRUD
+│   │   ├── system.py       # System operations
+│   │   ├── backup.py       # Git versioning
+│   │   ├── logs.py         # Log access
+│   │   ├── addons.py       # Add-on management
+│   │   ├── hacs.py         # HACS integration
+│   │   ├── lovelace.py     # Dashboard management
+│   │   └── ai_instructions.py # AI guidance docs
 │   ├── services/           # Business logic
-│   │   ├── ha_client.py    # HA API client
+│   │   ├── ha_client.py    # HA REST API client
+│   │   ├── ha_websocket.py # HA WebSocket client
+│   │   ├── supervisor_client.py # Supervisor API
 │   │   ├── file_manager.py # File operations
 │   │   └── git_manager.py  # Git versioning
 │   ├── models/             # Pydantic models
 │   │   └── schemas.py
-│   └── utils/              # Utilities
-│       └── logger.py
+│   ├── utils/              # Utilities
+│   │   ├── logger.py       # Logging setup
+│   │   └── yaml_editor.py  # YAML manipulation
+│   ├── templates/          # HTML templates
+│   │   └── ingress_panel.html
+│   └── ai_instructions/    # AI agent guidance
+├── tests/                  # Test suites
+├── CHANGELOG.md
 └── README.md
 ```
 
