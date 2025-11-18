@@ -290,10 +290,12 @@ async def delete_helper(entity_id: str):
                 # Reload the specific helper domain
                 ws_client = await get_ws_client()
                 await ws_client.call_service(domain, 'reload', {})
-                logger.info(f"Reloaded {domain} integration after YAML deletion")
+                logger.info(f"✅ Removed {entity_id} from YAML and reloaded {domain} integration")
                 deleted_via_yaml = True
+            else:
+                logger.debug(f"Helper {entity_id} not found in YAML file (may be storage helper or already removed)")
         except Exception as e:
-            logger.debug(f"Helper {entity_id} not found in YAML: {e}")
+            logger.debug(f"Could not check/delete from YAML for {entity_id}: {e}")
         
         # Try to delete via config entry API (for helpers created via UI/API)
         # Note: Helpers created via config entry need to be deleted through Home Assistant UI
@@ -396,19 +398,20 @@ async def delete_helper(entity_id: str):
         except Exception as e:
             logger.debug(f"Could not delete via config entry (helper may not exist or already deleted): {e}")
         
-        # Try to delete via entity registry (for restored entities from storage, not YAML)
-        # Note: YAML-managed helpers cannot be deleted via API - they must be removed from YAML
-        if not deleted_via_yaml and not deleted_via_config_entry:
-            try:
-                state = await ha_client.get_state(entity_id)
-                if state:
-                    ws_client = await get_ws_client()
-                    
-                    # Get entity registry entry to check if it's YAML-managed
-                    registry_result = await ws_client._send_message({
-                        'type': 'config/entity_registry/get',
-                        'entity_id': entity_id
-                    })
+        # Try to delete via entity registry (for all helpers that still exist)
+        # This works for storage helpers, and may work for restored entities even after YAML deletion
+        # Always try this if helper still exists, even if we deleted from YAML
+        # (restored entities may persist until restart, but we can try to remove from registry)
+        try:
+            state = await ha_client.get_state(entity_id)
+            if state:
+                ws_client = await get_ws_client()
+                
+                # Get entity registry entry to check if it's YAML-managed
+                registry_result = await ws_client._send_message({
+                    'type': 'config/entity_registry/get',
+                    'entity_id': entity_id
+                })
                     
                     logger.info(f"Entity registry get result for {entity_id}: {registry_result}")
                     
