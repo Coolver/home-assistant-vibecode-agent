@@ -415,8 +415,14 @@ async def delete_helper(entity_id: str):
                 
                 logger.info(f"Entity registry get result for {entity_id}: {registry_result}")
                 
-                if isinstance(registry_result, dict) and 'result' in registry_result:
-                    registry_entry = registry_result['result']
+                # Parse registry result - can be wrapped in {'result': ...} or direct dict
+                if isinstance(registry_result, dict):
+                    if 'result' in registry_result:
+                        registry_entry = registry_result['result']
+                    else:
+                        # Direct result (already the entry data)
+                        registry_entry = registry_result
+                    
                     logger.info(f"Registry entry for {entity_id}: {registry_entry}")
                     
                     if registry_entry:
