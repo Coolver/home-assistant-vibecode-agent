@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.9.4] - 2025-11-18
+
+### 🔧 IMPROVED: Helper Deletion Logic
+
+**Enhanced config entry deletion with multiple matching strategies**
+
+**Changes:**
+- ✅ Improved config entry search with multiple matching strategies:
+  - Match by title (common for UI-created helpers)
+  - Match by entity_id in options
+  - Match by entry details (deep search)
+- ✅ Added debug logging for config entry search process
+- ✅ Better error messages when helper exists but can't be deleted
+- ✅ More robust handling of config-entry-based helpers
+
+**Technical Details:**
+- Uses `config/config_entries/get` API to get detailed entry information
+- Tries multiple matching strategies before giving up
+- Provides detailed logging for troubleshooting
+
 ## [2.9.3] - 2025-11-18
 
 ### 🔧 IMPROVED: Helper Deletion
