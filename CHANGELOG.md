@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.9.11] - 2025-11-18
+
+### 🐛 FIX: Entity Registry Result Format Handling
+
+**Handle both wrapped and direct entity registry result formats**
+
+**Changes:**
+- ✅ Fixed parsing of entity registry result - API can return data directly or wrapped in `{'result': ...}`
+- ✅ Code now handles both formats correctly
+- ✅ Allows deletion to proceed for all helpers
+
+**Technical Details:**
+- WebSocket API `config/entity_registry/get` can return data in two formats:
+  - Wrapped: `{'result': {...}}`
+  - Direct: `{...}`
+- Code now checks for both formats and extracts entry data correctly
+
 ## [2.9.10] - 2025-11-18
 
 ### 🐛 FIX: Syntax Error in Entity Registry Deletion
