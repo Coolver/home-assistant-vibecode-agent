@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.9.6] - 2025-11-18
+
+### 🐛 DEBUG: Enhanced Entity Registry Deletion Logging
+
+**Added detailed logging for entity registry deletion debugging**
+
+**Changes:**
+- ✅ Added debug logging for entity registry get/remove operations
+- ✅ Better error messages with exception details
+- ✅ Logs registry entry data and API responses
+
 ## [2.9.5] - 2025-11-18
 
 ### 🔧 IMPROVED: Helper Deletion for Restored Entities
