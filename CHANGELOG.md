@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.9.10] - 2025-11-18
+
+### 🐛 FIX: Syntax Error in Entity Registry Deletion
+
+**Fixed try-except block indentation**
+
+**Changes:**
+- ✅ Fixed syntax error: `except` block was incorrectly nested inside `if state:` block
+- ✅ Moved `except` to correct level to match `try` block
+- ✅ Code now compiles correctly
+
 ## [2.9.9] - 2025-11-18
 
 ### 🔧 IMPROVED: Comprehensive Helper Deletion Strategy
