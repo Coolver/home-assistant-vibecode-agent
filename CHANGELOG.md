@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.9.9] - 2025-11-18
+
+### 🔧 IMPROVED: Comprehensive Helper Deletion Strategy
+
+**Delete helpers from all possible locations: YAML, config entry, and entity registry**
+
+**Changes:**
+- ✅ Always check and delete from YAML first (if helper exists there)
+- ✅ Then try config entry deletion (for storage helpers)
+- ✅ Then try entity registry deletion via WebSocket (even if YAML deletion succeeded)
+- ✅ This ensures we delete everywhere possible, including restored entities
+- ✅ Better logging to show which methods were used
+
+**Technical Details:**
+- YAML deletion: removes from YAML file and reloads integration
+- Config entry deletion: finds and deletes config entry for storage helpers
+- Entity registry deletion: removes from entity registry via WebSocket (works for all helpers)
+- For restored entities: deletion from entity registry may work temporarily even after YAML removal
+
 ## [2.9.8] - 2025-11-18
 
 ### 🔧 IMPROVED: WebSocket Deletion for All Helpers
