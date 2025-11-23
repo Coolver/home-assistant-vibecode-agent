@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.9.17] - 2025-11-23
+
+### 🐛 BUGFIX: Indentation Error in Helpers Delete Function
+
+- ✅ Fixed IndentationError in `app/api/helpers.py` delete helper function
+- ✅ Corrected try-except block indentation
+- ✅ Agent should now start correctly
+
 ## [2.9.16] - 2025-11-23
 
 ### ✨ NEW: Automatic Checkpoint System for Git Versioning
