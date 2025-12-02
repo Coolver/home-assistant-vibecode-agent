@@ -128,7 +128,7 @@ The MCP server requires Node.js to run on your computer (where Cursor is install
 
 Open your **Home Assistant UI** (usually http://homeassistant.local:8123):
 
-1. Go to **Settings** → **Add-ons** → **Add-on Store** → **⋮** → **Repositories**
+1. Go to **Settings** → **Add-ons** → **Add-on Store** → **⋮** → **Repositories** (usually http://homeassistant.local:8123/hassio/dashboard )
 2. Add: `https://github.com/Coolver/home-assistant-cursor-agent`
 3. Click **Add**
 
