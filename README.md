@@ -1,4 +1,4 @@
-# HA Cursor Agent - Home Assistant Add-on
+# HA AI Agent for Cursor, VS Code or other IDE with MCP support - Home Assistant Add-on
 
 [![Version](https://img.shields.io/badge/version-2.9.19-blue.svg)](https://github.com/Coolver/home-assistant-cursor-agent)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
