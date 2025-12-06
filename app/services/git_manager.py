@@ -245,15 +245,15 @@ secrets.yaml
             # When we reach max_backups (50), we keep only 30 commits and continue
             # Count commits in current branch only (not all commits in repo)
             try:
-                # Use git log to count only commits in current branch
+                # Use git rev-list to count only commits reachable from HEAD
                 # This excludes dangling objects that may still exist after cleanup
-                log_output = self.repo.git.log('--oneline', 'HEAD')
-                lines = [line for line in log_output.strip().split('\n') if line.strip()]
-                commit_count = len(lines)
-                logger.debug(f"Commit count via git log: {commit_count} (log output length: {len(log_output)})")
+                # Use --no-merges to avoid counting merge commits separately
+                rev_list_output = self.repo.git.rev_list('--count', '--no-merges', 'HEAD')
+                commit_count = int(rev_list_output.strip())
+                logger.info(f"Commit count via rev-list: {commit_count}")
             except Exception as e:
                 # Fallback: count commits using iter_commits with HEAD
-                logger.warning(f"git log failed, using iter_commits fallback: {e}")
+                logger.warning(f"git rev-list failed, using iter_commits fallback: {e}")
                 commit_count = len(list(self.repo.iter_commits('HEAD', max_count=1000)))
             
             if commit_count >= self.max_backups:
@@ -359,15 +359,15 @@ secrets.yaml
         try:
             # Count commits in current branch only (not all commits in repo)
             try:
-                # Use git log to count only commits in current branch
+                # Use git rev-list to count only commits reachable from HEAD
                 # This excludes dangling objects that may still exist after cleanup
-                log_output = self.repo.git.log('--oneline', 'HEAD')
-                lines = [line for line in log_output.strip().split('\n') if line.strip()]
-                total_commits = len(lines)
-                logger.debug(f"Total commits via git log: {total_commits} (log output length: {len(log_output)})")
+                # Use --no-merges to avoid counting merge commits separately
+                rev_list_output = self.repo.git.rev_list('--count', '--no-merges', 'HEAD')
+                total_commits = int(rev_list_output.strip())
+                logger.info(f"Total commits via rev-list: {total_commits}")
             except Exception as e:
                 # Fallback: count commits using iter_commits with HEAD
-                logger.warning(f"git log failed, using iter_commits fallback: {e}")
+                logger.warning(f"git rev-list failed, using iter_commits fallback: {e}")
                 total_commits = len(list(self.repo.iter_commits('HEAD', max_count=1000)))
             
             # Keep 30 commits when we reach 50 (max_backups)
