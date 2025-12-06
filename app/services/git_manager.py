@@ -284,6 +284,17 @@ secrets.yaml
             if commit_count >= self.max_backups:
                 # At max_backups, cleanup to keep only 30 commits
                 await self._cleanup_old_commits()
+                
+                # After cleanup, reload repository to ensure we have correct state
+                # This is critical because cleanup replaces .git directory
+                try:
+                    self.repo = git.Repo(self.repo.working_dir)
+                    # Verify cleanup worked by checking commit count again
+                    rev_list_output = self.repo.git.rev_list('--count', '--first-parent', 'HEAD')
+                    new_count = int(rev_list_output.strip())
+                    logger.info(f"After cleanup: Repository now has {new_count} commits (was {commit_count})")
+                except Exception as reload_error:
+                    logger.warning(f"Failed to reload repository after cleanup: {reload_error}")
             
             return commit_hash
         except Exception as e:
@@ -474,15 +485,26 @@ secrets.yaml
                     # Continue with fallback method below
             
             # Use clone with depth method (simpler and more reliable)
-            # Ensure all current changes are committed before cleanup
-            if self.repo.is_dirty(untracked_files=True):
-                await self.commit_changes("Pre-cleanup commit: save current state")
+            # Note: We don't commit uncommitted changes here because cleanup is called
+            # AFTER a commit was just made, so there should be no uncommitted changes.
+            # If there are, they will be lost during cleanup (which is acceptable for automatic cleanup).
             
             # Save current branch name
             current_branch = self.repo.active_branch.name
             
             # Use clone with depth method
             await self._cleanup_using_clone_depth(total_commits, commits_to_keep_count, current_branch)
+            
+            # After cleanup, verify the count is correct and reload repository
+            # This ensures we have the correct state for future operations
+            try:
+                self.repo = git.Repo(self.repo.working_dir)
+                # Force refresh by checking commit count again
+                rev_list_output = self.repo.git.rev_list('--count', '--first-parent', 'HEAD')
+                final_count = int(rev_list_output.strip())
+                logger.info(f"✅ Cleanup verification: Repository now has {final_count} commits")
+            except Exception as verify_error:
+                logger.warning(f"Failed to verify cleanup result: {verify_error}")
             
         except Exception as cleanup_error:
             logger.error(f"Failed to cleanup commits: {cleanup_error}")
