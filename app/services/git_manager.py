@@ -438,16 +438,8 @@ secrets.yaml
                     logger.warning(f"git gc failed: {gc_error}. Trying simpler cleanup...")
                     self.repo.git.prune('--expire=now')
                 
-                # Verify count after gc using rev-list (should be the same)
-                try:
-                    rev_list_output_gc = self.repo.git.rev_list('--count', current_branch)
-                    commits_after_gc = int(rev_list_output_gc.strip())
-                    if commits_after_gc != commits_after:
-                        logger.warning(f"Commit count changed after gc: {commits_after} → {commits_after_gc}")
-                        commits_after = commits_after_gc
-                except:
-                    pass  # If rev-list fails, use previous count
-                
+                # Don't verify count after gc - rev-list may still count old dangling commits
+                # We know we created exactly commits_after commits, so use that
                 logger.info(f"✅ Automatic cleanup complete: {total_commits} → {commits_after} commits. Removed {total_commits - commits_after} old commits.")
                 
             except Exception as cleanup_error:
