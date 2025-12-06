@@ -38,6 +38,15 @@ class HomeAssistantClient:
         """Make HTTP request to HA API"""
         url = f"{self.url}/api/{endpoint}"
         
+        # For POST requests, aiohttp may not handle query params correctly
+        # Manually append them to URL if needed
+        if method == 'POST' and params:
+            from urllib.parse import urlencode
+            query_string = urlencode(params)
+            if query_string:
+                url = f"{url}?{query_string}"
+                params = None  # Clear params to avoid double encoding
+        
         # Debug logging
         token_preview = f"{self.token[:20]}..." if self.token else "EMPTY"
         logger.debug(f"HA API Request: {method} {url}, Token: {token_preview}")
