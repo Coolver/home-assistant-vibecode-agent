@@ -87,19 +87,11 @@ class HomeAssistantClient:
         """Call a Home Assistant service"""
         endpoint = f"services/{domain}/{service}"
         
-        # Some services require return_response as query parameter (e.g., file.read_file)
-        # Remove return_response from data if present (it should be a query param, not in body)
+        # Some services need special handling
         params = None
         timeout = None
         
-        if domain == 'file' and service == 'read_file':
-            # Remove return_response from data dict if it's there (should be query param)
-            if 'return_response' in data:
-                data = {k: v for k, v in data.items() if k != 'return_response'}
-            # Home Assistant API requires return_response as query parameter for file.read_file
-            # Use string 'true' not boolean True to avoid it being sent in body
-            params = {'return_response': 'true'}
-        elif domain == 'hassio' and service in ['backup_full', 'backup_partial', 'restore_full', 'restore_partial']:
+        if domain == 'hassio' and service in ['backup_full', 'backup_partial', 'restore_full', 'restore_partial']:
             # Long-running operations need more time
             timeout = 300  # 5 minutes for backup/restore operations
         
