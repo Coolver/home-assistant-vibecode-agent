@@ -424,13 +424,19 @@ secrets.yaml
                 
                 # Count commits in current branch using git rev-list (more accurate)
                 # This counts only commits reachable from current branch HEAD
+                # We know we should have exactly commits_to_keep_count commits
+                commits_after = commits_to_keep_count
+                
+                # Verify using rev-list
                 try:
                     rev_list_output = self.repo.git.rev_list('--count', current_branch)
-                    commits_after = int(rev_list_output.strip())
+                    rev_list_count = int(rev_list_output.strip())
+                    if rev_list_count != commits_after:
+                        logger.warning(f"Expected {commits_after} commits, but rev-list shows {rev_list_count}. Using rev-list count.")
+                        commits_after = rev_list_count
                 except Exception as count_error:
-                    # Fallback to iter_commits if rev-list fails
-                    logger.warning(f"rev-list count failed: {count_error}. Using iter_commits fallback.")
-                    commits_after = len(list(self.repo.iter_commits(current_branch)))
+                    # Fallback: use expected count
+                    logger.warning(f"rev-list count failed: {count_error}. Using expected count ({commits_after}).")
                 
                 # Use simpler gc without aggressive pruning to avoid OOM
                 # This removes dangling objects (old unreachable commits)
