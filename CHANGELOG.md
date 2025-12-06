@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.0] - 2025-12-06
+
+### 🎉 MAJOR: Multi-IDE Support & UI Redesign
+
+**Expanded AI Assistant Support:**
+- ✅ Added support for VS Code (including free tier) with GitHub Copilot
+- ✅ Added support for any IDE that supports MCP (Model Context Protocol)
+- ✅ Renamed from "HA Cursor Agent" to "HA Vibecode Agent" to reflect multi-IDE support
+- ✅ Updated all documentation to reflect support for multiple AI assistants
+
+**Web UI Improvements:**
+- ✅ Redesigned settings interface with tab-based navigation
+- ✅ Added dedicated setup instructions for VS Code + GitHub Copilot
+- ✅ Added dedicated setup instructions for Cursor AI
+- ✅ Replaced emoji icons with SVG icons for better cross-browser compatibility
+- ✅ Improved key management with dedicated input field and copy/regenerate buttons
+- ✅ Streamlined installation steps for better user experience
+
+**Technical Changes:**
+- ✅ Updated MCP configuration generation for both Cursor and VS Code
+- ✅ Enhanced ingress panel with responsive tab switching
+- ✅ Improved UI accessibility and browser compatibility
+
 ## [2.9.17] - 2025-11-23
 
 ### 🐛 BUGFIX: Indentation Error in Helpers Delete Function
