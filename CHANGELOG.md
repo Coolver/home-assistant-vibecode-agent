@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.2] - 2025-12-06
+
+### ✨ Redesigned Git Versioning & Backup System
+
+**Automatic backup system with AI-powered change descriptions**
+
+The built-in Git versioning and backup system has been completely redesigned. Now, every time you modify scripts, dashboards, and configuration files, the agent automatically saves changes to the onboard Git repository and allows you to easily rollback to any previous version.
+
+**Key improvements:**
+- ✅ **AI-generated change descriptions**: The agent now uses AI to create meaningful descriptions of what changed and why (e.g., "Add automation: Control lights when motion detected")
+- ✅ **Easy change history**: You can ask AI to show a list of recent changes and quickly find what you need
+- ✅ **Smart rollback**: Simply describe what you want to rollback to (e.g., "rollback to when I added the motion sensor automation") and AI will find and restore it
+
+**Bug fix:**
+- ✅ **Fixed backup size issue**: Previously, large database or media files could accidentally be included in Git backups, causing rapid repository growth. Now only configuration files, scripts, automations, and dashboards are tracked in Git, keeping backups small and efficient.
+
 ## [2.10.1] - 2025-12-06
 
 ### 🐛 CRITICAL BUGFIX: Git Backup Size Issue

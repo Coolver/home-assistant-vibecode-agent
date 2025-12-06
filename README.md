@@ -46,7 +46,8 @@ https://github.com/user-attachments/assets/0df48019-06c0-48dd-82ad-c7fe0734ddb3
 ✅ **Auto-updates** - keep all HACS repositories up to date  
 
 ### 🔒 Safe Operations
-✅ **Git versioning** - automatic backups of every change  
+✅ **Git versioning** - automatic backups of every change with meaningful commit messages  
+✅ **Meaningful commits** - AI-generated descriptive messages explaining what and why changed  
 ✅ **Configuration validation** - tests before applying  
 ✅ **Rollback capability** - undo any change instantly  
 ✅ **Activity monitoring** - full audit log of all operations  
@@ -96,11 +97,20 @@ https://github.com/user-attachments/assets/0df48019-06c0-48dd-82ad-c7fe0734ddb3
 - Safe path handling (restricted to `/config`)
 
 ### 💾 Git Versioning
-- Automatic commit on every change
-- Backup history (up to 50 commits)
-- Rollback to any previous state
+- Automatic commit on every change with meaningful commit messages
+- AI-generated descriptive messages explaining what and why changed
+- Backup history (up to 30 commits, configurable)
+- Automatic cleanup of old commits to prevent repository bloat
+- **View change history** - ask AI to show recent commits with meaningful messages
+- **Easy rollback** - ask AI to rollback to any previous version by description or commit hash
 - View diffs between versions
-- Commit messages for tracking
+- Commit messages include operation context (e.g., "Add automation: Control lights when motion detected")
+
+**Example AI interactions:**
+- *"Show me the last 10 changes to my configuration"* → AI displays commit history with meaningful messages
+- *"Something broke! Rollback to the version from yesterday"* → AI finds and restores previous version
+- *"What changed in the last commit?"* → AI shows detailed diff
+- *"Rollback to when I added the motion sensor automation"* → AI finds and restores that specific commit
 
 ### 📊 Monitoring & Troubleshooting
 - Agent logs API with filtering
@@ -224,7 +234,9 @@ With this add-on and [MCP integration](https://github.com/Coolver/home-assistant
 ✅ **Analyze YOUR configuration** - detects your actual devices and entities  
 ✅ **Create complex systems autonomously** - 10+ interconnected automations  
 ✅ **Tailored to your setup** - uses your specific entity IDs and device capabilities  
-✅ **Automatic backups** - every change is Git-versioned  
+✅ **Automatic backups** - every change is Git-versioned with meaningful commit messages  
+✅ **View change history** - ask AI to show recent commits and what changed  
+✅ **Easy rollback** - ask AI to rollback to any previous version by description or date  
 ✅ **Intelligent debugging** - reads logs, finds issues, fixes them  
 ✅ **Error recovery** - can rollback if something goes wrong  
 ✅ **End-to-end deployment** - from analysis to production  
@@ -277,7 +289,7 @@ port: 8099                    # API port
 log_level: info               # Logging: debug, info, warning, error
 enable_git_versioning: true   # Enable automatic backups
 auto_backup: true             # Auto-commit on changes
-max_backups: 50               # Maximum commits to keep
+max_backups: 30               # Maximum commits to keep (default: 30, cleanup keeps last 20)
 ```
 
 ---
@@ -614,7 +626,7 @@ curl -H "Authorization: Bearer YOUR_AGENT_KEY" \
 
 - ✅ **Path validation** - Cannot access files outside `/config`
 - ✅ **Authentication required** - All endpoints (except health) require token
-- ✅ **Automatic backups** - Git commits before modifications
+- ✅ **Automatic backups** - Git commits before modifications with meaningful commit messages
 - ✅ **Rollback capability** - Restore any previous state
 - ✅ **Configuration validation** - Check before applying
 - ✅ **Audit logs** - Track all operations
@@ -723,11 +735,33 @@ AI via Agent:
 8. Validates installation
 9. Shows dashboard YAML for user to add
    ↓
-User: "Something's wrong, rollback!"
+User: "Show me the last 10 changes to my configuration"
    ↓
 AI via Agent:
-1. Gets backup history
-2. Rolls back to previous commit
+1. Calls `ha_git_history` to get commit history
+2. Displays commits with meaningful messages:
+   - "Add automation: Control lights when motion detected"
+   - "Update theme: Change primary color to blue"
+   - "Add helper: Enable/disable climate system"
+3. Shows timestamps and commit hashes
+4. Helps identify which changes to review
+
+User: "Something broke! Rollback to the version from yesterday"
+   ↓
+AI via Agent:
+1. Gets recent commit history
+2. Finds commits from yesterday
+3. Shows options with descriptions
+4. Rolls back to selected version
+5. Verifies rollback was successful
+
+User: "Rollback to when I added the motion sensor automation"
+   ↓
+AI via Agent:
+1. Searches commit history for "motion sensor automation"
+2. Finds matching commit
+3. Shows commit details
+4. Rolls back to that specific version
 3. Restarts HA
 4. Verifies restoration
 ```
@@ -757,8 +791,12 @@ AI via Agent:
 
 - Creates `.git` folder in `/config` if not exists
 - Auto-commits on every change (if enabled)
-- Stores up to 50 commits (configurable)
-- Commit messages include operation details
+- **Meaningful commit messages**: AI-generated descriptive messages explaining what and why changed
+  - Examples: "Add automation: Control lights when motion detected", "Update theme: Change primary color to blue"
+  - Messages are generated based on operation context and user-provided descriptions
+- Stores up to 30 commits (configurable via `max_backups`)
+- Automatic cleanup: When reaching max commits, keeps last 20 commits (maintains buffer)
+- Commit messages include operation details and context
 
 ### File Operations
 
