@@ -407,7 +407,19 @@ async def delete_helper(entity_id: str, commit_message: Optional[str] = Query(No
         # Always try this if helper still exists, even if we deleted from YAML
         # (restored entities may persist until restart, but we can try to remove from registry)
         try:
-            state = await ha_client.get_state(entity_id)
+            # Check if entity exists (404 is expected if already deleted from YAML)
+            try:
+                state = await ha_client.get_state(entity_id, suppress_404_logging=True)
+            except Exception as state_error:
+                # 404 is expected when entity doesn't exist (already deleted or never existed)
+                error_str = str(state_error)
+                if "404" in error_str or "Entity not found" in error_str:
+                    logger.debug(f"Entity {entity_id} not found (expected if already deleted): {error_str}")
+                    state = None
+                else:
+                    # Re-raise unexpected errors
+                    raise
+            
             if state:
                 ws_client = await get_ws_client()
                 
@@ -474,14 +486,19 @@ async def delete_helper(entity_id: str, commit_message: Optional[str] = Query(No
         except HTTPException:
             raise
         except Exception as e:
-            logger.warning(f"Could not delete via entity registry: {e}", exc_info=True)
+            # Don't log traceback for expected 404 errors
+            error_str = str(e)
+            if "404" in error_str or "Entity not found" in error_str:
+                logger.debug(f"Could not delete via entity registry (entity not found, expected): {error_str}")
+            else:
+                logger.warning(f"Could not delete via entity registry: {e}", exc_info=True)
         
         # If neither method worked, check if helper actually exists
         if not deleted_via_yaml and not deleted_via_config_entry:
             # Check if helper exists in HA
             helper_exists = False
             try:
-                state = await ha_client.get_state(entity_id)
+                state = await ha_client.get_state(entity_id, suppress_404_logging=True)
                 if state:
                     helper_exists = True
             except:

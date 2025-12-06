@@ -34,9 +34,14 @@ class HomeAssistantClient:
         endpoint: str,
         data: Optional[Dict] = None,
         params: Optional[Dict[str, Any]] = None,
-        timeout: Optional[int] = None
+        timeout: Optional[int] = None,
+        suppress_404_logging: bool = False
     ) -> Dict:
-        """Make HTTP request to HA API"""
+        """Make HTTP request to HA API
+        
+        Args:
+            suppress_404_logging: If True, 404 errors will be logged as DEBUG instead of ERROR
+        """
         url = f"{self.url}/api/{endpoint}"
         
         # For POST requests, aiohttp handles query params correctly via params argument
@@ -62,7 +67,11 @@ class HomeAssistantClient:
                 ) as response:
                     if response.status >= 400:
                         text = await response.text()
-                        logger.error(f"HA API error: {response.status} - {text} | URL: {url} | Data: {data} | Params: {params} | Token used: {token_preview}")
+                        # 404 is often expected (entity not found), log as DEBUG if suppressed
+                        if response.status == 404 and suppress_404_logging:
+                            logger.debug(f"HA API 404 (expected): {text} | URL: {url}")
+                        else:
+                            logger.error(f"HA API error: {response.status} - {text} | URL: {url} | Data: {data} | Params: {params} | Token used: {token_preview}")
                         raise Exception(f"HA API error: {response.status} - {text}")
                     
                     logger.debug(f"HA API success: {method} {url} -> {response.status}")
@@ -75,9 +84,14 @@ class HomeAssistantClient:
         """Get all entity states"""
         return await self._request('GET', 'states')
     
-    async def get_state(self, entity_id: str) -> Dict:
-        """Get specific entity state"""
-        return await self._request('GET', f'states/{entity_id}')
+    async def get_state(self, entity_id: str, suppress_404_logging: bool = False) -> Dict:
+        """Get specific entity state
+        
+        Args:
+            entity_id: Entity ID to get state for
+            suppress_404_logging: If True, 404 errors will be logged as DEBUG instead of ERROR
+        """
+        return await self._request('GET', f'states/{entity_id}', suppress_404_logging=suppress_404_logging)
     
     async def get_services(self) -> List[Dict]:
         """Get all available services"""

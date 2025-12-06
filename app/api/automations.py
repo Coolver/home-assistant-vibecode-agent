@@ -79,7 +79,9 @@ async def create_automation(automation: AutomationData):
             raise ValueError(f"Automation with ID '{automation.id}' already exists")
         
         # Add new automation (exclude commit_message as it's not part of automation config)
-        new_automation = automation.model_dump(exclude={'commit_message'}, exclude_none=True)
+        new_automation = automation.model_dump(exclude_none=True)
+        # Remove commit_message if present (it's only for Git, not part of automation config)
+        new_automation.pop('commit_message', None)
         automations.append(new_automation)
         
         # Write back
