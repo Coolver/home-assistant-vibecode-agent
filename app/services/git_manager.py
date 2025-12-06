@@ -382,29 +382,27 @@ secrets.yaml
                 parent_commit = oldest_keep_commit.parents[0] if oldest_keep_commit.parents else None
                 
                 if parent_commit:
-                    # Use rebase --onto: rebase commits from parent_commit to HEAD onto oldest_keep_commit
-                    # This keeps all commits from oldest_keep_commit to HEAD, removing older ones
                     try:
-                        # Save current HEAD before rebase
-                        current_head = self.repo.head.commit.hexsha
-                        # Rebase: take commits from parent_commit..HEAD and rebase them onto oldest_keep_commit
+                        # Use rebase --onto: rebase commits from parent_commit to HEAD onto oldest_keep_commit
+                        # This keeps all commits from oldest_keep_commit to HEAD, removing older ones
+                        # The syntax is: git rebase --onto <newbase> <upstream> <branch>
+                        # This means: take commits from <upstream> to <branch> and rebase them onto <newbase>
+                        # In our case: take commits from parent_commit to HEAD and rebase onto oldest_keep_commit
                         self.repo.git.rebase('--onto', oldest_keep_commit.hexsha, parent_commit.hexsha, current_branch)
                     except Exception as rebase_error:
-                        # If rebase fails (e.g., conflicts), abort and use fallback
-                        logger.warning(f"Rebase failed: {rebase_error}. Using fallback approach...")
+                        # If rebase fails (e.g., conflicts), abort and skip cleanup
+                        logger.warning(f"Rebase failed: {rebase_error}. Aborting cleanup to avoid data loss.")
                         try:
                             self.repo.git.rebase('--abort')
                         except:
                             pass
-                        # Fallback: just move branch to oldest commit (loses newer commits, but safer)
-                        # This is not ideal, but better than failing completely
-                        logger.warning("Using fallback: moving branch to oldest commit (may lose some newer commits)")
-                        self.repo.git.update_ref(f'refs/heads/{current_branch}', oldest_keep_commit.hexsha)
-                        self.repo.git.reset('--hard', current_branch)
+                        # Don't proceed with cleanup if rebase fails - better to keep all commits than lose data
+                        logger.error("Cleanup aborted - rebase failed. Repository unchanged.")
+                        return
                 else:
                     # Oldest commit has no parent (root commit), can't use rebase
-                    # Just ensure we're on the right commit
-                    logger.warning("Oldest commit is root commit, skipping rebase")
+                    logger.warning("Oldest commit is root commit, skipping cleanup")
+                    return
                 
                 # Use simpler gc without aggressive pruning to avoid OOM
                 try:
@@ -494,22 +492,32 @@ secrets.yaml
             parent_commit = oldest_keep_commit.parents[0] if oldest_keep_commit.parents else None
             
             if parent_commit:
-                # Use rebase --onto: rebase commits from parent_commit to HEAD onto oldest_keep_commit
                 try:
-                    current_head = self.repo.head.commit.hexsha
+                    # Use rebase --onto: rebase commits from parent_commit to HEAD onto oldest_keep_commit
                     self.repo.git.rebase('--onto', oldest_keep_commit.hexsha, parent_commit.hexsha, current_branch)
                 except Exception as rebase_error:
-                    logger.warning(f"Rebase failed: {rebase_error}. Using fallback approach...")
+                    logger.warning(f"Rebase failed: {rebase_error}. Aborting cleanup.")
                     try:
                         self.repo.git.rebase('--abort')
                     except:
                         pass
-                    # Fallback: just move branch to oldest commit
-                    logger.warning("Using fallback: moving branch to oldest commit")
-                    self.repo.git.update_ref(f'refs/heads/{current_branch}', oldest_keep_commit.hexsha)
-                    self.repo.git.reset('--hard', current_branch)
+                    # Don't proceed with cleanup if rebase fails
+                    return {
+                        "success": False,
+                        "message": f"Cleanup failed: {rebase_error}",
+                        "commits_before": total_commits,
+                        "commits_after": total_commits,
+                        "backup_branches_deleted": 0
+                    }
             else:
                 logger.warning("Oldest commit is root commit, skipping rebase")
+                return {
+                    "success": False,
+                    "message": "Oldest commit is root commit, cannot cleanup",
+                    "commits_before": total_commits,
+                    "commits_after": total_commits,
+                    "backup_branches_deleted": 0
+                }
             
             # Clean up backup branches if requested
             deleted_branches = 0
