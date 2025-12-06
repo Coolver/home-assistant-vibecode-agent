@@ -250,22 +250,23 @@ secrets.yaml
             try:
                 # Get current branch name
                 current_branch = self.repo.active_branch.name
-                
-                # If we have a last known count after cleanup, use it as baseline
-                if self.last_known_commit_count is not None:
-                    # Increment from last known count
-                    commit_count = self.last_known_commit_count + 1
-                    logger.info(f"Commit count: {commit_count} (incremented from last known: {self.last_known_commit_count})")
-                else:
-                    # Use git log to count only commits in current branch
-                    # This is more reliable than rev-list which may count dangling objects
-                    log_output = self.repo.git.log('--oneline', current_branch, '--max-count=100')
-                    commit_count = len([line for line in log_output.strip().split('\n') if line.strip()])
-                    logger.info(f"Commit count via git log ({current_branch}): {commit_count}")
+                # Use git rev-list to count only commits reachable from HEAD
+                # This is more reliable - it counts only commits in the current branch history
+                # Use --first-parent to follow only the main branch (not merge commits)
+                rev_list_output = self.repo.git.rev_list('--count', '--first-parent', 'HEAD')
+                commit_count = int(rev_list_output.strip())
+                logger.info(f"Commit count via rev-list --first-parent HEAD ({current_branch}): {commit_count}")
             except Exception as e:
-                # Fallback: count commits using iter_commits with HEAD
-                logger.warning(f"git log failed, using iter_commits fallback: {e}")
-                commit_count = len(list(self.repo.iter_commits('HEAD', max_count=1000)))
+                # Fallback: use git log with explicit HEAD reference
+                logger.warning(f"git rev-list failed, using git log fallback: {e}")
+                try:
+                    log_output = self.repo.git.log('--oneline', '--first-parent', 'HEAD', '--max-count=100')
+                    commit_count = len([line for line in log_output.strip().split('\n') if line.strip()])
+                    logger.info(f"Commit count via git log --first-parent HEAD: {commit_count}")
+                except Exception as e2:
+                    # Last fallback: count commits using iter_commits with HEAD
+                    logger.warning(f"git log failed, using iter_commits fallback: {e2}")
+                    commit_count = len(list(self.repo.iter_commits('HEAD', max_count=1000)))
             
             if commit_count >= self.max_backups:
                 # At max_backups, cleanup to keep only 30 commits
