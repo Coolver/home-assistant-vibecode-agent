@@ -1,4 +1,4 @@
-# HA AI Agent for Cursor, VS Code or other IDE with MCP support - Home Assistant Add-on
+# HA Vibecode Agent - Home Assistant Add-on
 
 [![Version](https://img.shields.io/badge/version-2.10.0-blue.svg)](https://github.com/Coolver/home-assistant-cursor-agent)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -26,7 +26,7 @@ https://github.com/user-attachments/assets/0df48019-06c0-48dd-82ad-c7fe0734ddb3
 
 ## 🎯 What is this?
 
-**HA Cursor Agent** is a Home Assistant Add-on that provides a **REST API** enabling AI assistants (like Cursor AI, VS Code or other IDEs via [MCP protocol](https://github.com/Coolver/home-assistant-mcp)) to:
+**HA Vibecode Agent** is a Home Assistant Add-on that provides a **REST API** enabling AI assistants (like Cursor AI, VS Code or other IDEs via [MCP protocol](https://github.com/Coolver/home-assistant-mcp)) to:
 
 ### 🔍 Analyze Your Setup
 ✅ **Read entire configuration** - entities, automations, scripts, helpers  
@@ -126,7 +126,7 @@ Open your **Home Assistant UI** (usually http://homeassistant.local:8123):
 Still in **Home Assistant UI**:
 
 1. Refresh the page
-2. Find **HA Cursor Agent** → Click **INSTALL**
+2. Find **HA Vibecode Agent** → Click **INSTALL**
 3. Wait for installation to complete
 4. Enable → **Start on boot: ON** → and push **START** button
 5. **Wait for startup** (~10 seconds)
@@ -135,7 +135,7 @@ Still in **Home Assistant UI**:
 You'll see this interface:
 
 <p align="center">
-  <img src=".github/images/ingress-panel.jpg" alt="HA Cursor Agent Ingress Panel" width="700">
+  <img src=".github/images/ingress-panel.jpg" alt="HA Vibecode Agent Ingress Panel" width="700">
 </p>
 
 7. Click the **Cursor** or **VS Code** tab (depending on which IDE you want to use with Home Assistant) and **follow the setup instructions**. You’ll need to install and configure Cursor or VS Code so they can connect to the HA Agent via the MCP protocol.
@@ -242,7 +242,7 @@ With this add-on and [MCP integration](https://github.com/Coolver/home-assistant
 3. Select **Repositories**
 4. Add repository URL: `https://github.com/Coolver/home-assistant-cursor-agent`
 5. Click **Add**
-6. Refresh the page - find **HA Cursor Agent** in the list
+6. Refresh the page - find **HA Vibecode Agent** in the list
 7. Click **INSTALL**
 8. Configure and start
 
@@ -254,7 +254,7 @@ With this add-on and [MCP integration](https://github.com/Coolver/home-assistant
    - Supervisor → Add-on Store → ⋮ → Check for updates
 
 3. **Install the Add-on:**
-   - Find "HA Cursor Agent" in Local Add-ons
+   - Find "HA Vibecode Agent" in Local Add-ons
    - Click **INSTALL**
 
 4. **Configure:**
@@ -460,7 +460,7 @@ All API endpoints (except `/api/health`) require authentication.
 
 The add-on uses **Agent Key** authentication:
 
-1. Get your Agent Key from **Web UI** (Settings → Add-ons → HA Cursor Agent → Open Web UI)
+1. Get your Agent Key from **Web UI** (Settings → Add-ons → HA Vibecode Agent → Open Web UI)
 2. Configure in Cursor MCP settings with `HA_AGENT_KEY`
 3. Agent Key is auto-generated on first start
 
@@ -779,7 +779,7 @@ AI via Agent:
 
 ### Add-on won't start
 
-**Check logs:** Supervisor → HA Cursor Agent → Logs
+**Check logs:** Supervisor → HA Vibecode Agent → Logs
 
 Common issues:
 - Port 8099 already in use
@@ -789,7 +789,7 @@ Common issues:
 ### API returns 401 Unauthorized
 
 - Check Agent Key is correct
-- Regenerate key if needed: Settings → Add-ons → HA Cursor Agent → Open Web UI
+- Regenerate key if needed: Settings → Add-ons → HA Vibecode Agent → Open Web UI
 - Ensure Authorization header is present
 - Format: `Authorization: Bearer YOUR_AGENT_KEY`
 
