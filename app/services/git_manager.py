@@ -243,8 +243,16 @@ secrets.yaml
             
             # Cleanup old commits if needed
             # When we reach max_backups (50), we keep only 30 commits and continue
-            commits = list(self.repo.iter_commits())
-            if len(commits) >= self.max_backups:
+            # Count commits in current branch only (not all commits in repo)
+            try:
+                current_branch = self.repo.active_branch.name
+                rev_list_output = self.repo.git.rev_list('--count', current_branch)
+                commit_count = int(rev_list_output.strip())
+            except Exception:
+                # Fallback to iter_commits if rev-list fails
+                commit_count = len(list(self.repo.iter_commits()))
+            
+            if commit_count >= self.max_backups:
                 # At max_backups, cleanup to keep only 30 commits
                 await self._cleanup_old_commits()
             
@@ -345,8 +353,14 @@ secrets.yaml
         - Ability to rollback to any of the last 30 versions
         """
         try:
-            commits = list(self.repo.iter_commits())
-            total_commits = len(commits)
+            # Count commits in current branch only (not all commits in repo)
+            try:
+                current_branch = self.repo.active_branch.name
+                rev_list_output = self.repo.git.rev_list('--count', current_branch)
+                total_commits = int(rev_list_output.strip())
+            except Exception:
+                # Fallback to iter_commits if rev-list fails
+                total_commits = len(list(self.repo.iter_commits()))
             
             # Keep 30 commits when we reach 50 (max_backups)
             commits_to_keep_count = 30
