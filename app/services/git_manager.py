@@ -274,8 +274,9 @@ secrets.yaml
             # Always log this check (not debug) to see what's happening
             logger.info(f"Checking cleanup: commit_count={commit_count}, max_backups={self.max_backups}, need_cleanup={commit_count >= self.max_backups}")
             if commit_count >= self.max_backups:
-                logger.info(f"⚠️ Cleanup triggered: commit_count ({commit_count}) >= max_backups ({self.max_backups})")
-                # At max_backups (30), cleanup to keep only 20 commits
+                commits_to_keep = max(10, self.max_backups - 10)
+                logger.info(f"⚠️ Cleanup triggered: commit_count ({commit_count}) >= max_backups ({self.max_backups}), will keep {commits_to_keep} commits")
+                # At max_backups, cleanup to keep only (max_backups - 10) commits
                 await self._cleanup_old_commits()
                 
                 # After cleanup, reload repository to ensure we have correct state
@@ -389,16 +390,16 @@ secrets.yaml
             return False
     
     async def _cleanup_old_commits(self):
-        """Remove old commits to save space - keeps only 20 commits when reaching 30
+        """Remove old commits to save space - keeps only (max_backups - 10) commits when reaching max_backups
         
-        This is called automatically when commits reach max_backups (30).
-        We keep only 20 commits to have buffer before next cleanup.
+        This is called automatically when commits reach max_backups.
+        We keep (max_backups - 10) commits to have buffer of 10 before next cleanup.
         For manual cleanup with backup branch deletion, use cleanup_commits().
         
         This method safely removes old commits while preserving:
         - All current files on disk (unchanged)
-        - Last 20 commits (history)
-        - Ability to rollback to any of the last 20 versions
+        - Last (max_backups - 10) commits (history)
+        - Ability to rollback to any of the last (max_backups - 10) versions
         
         Uses git filter-repo if available (recommended), otherwise falls back to clone method.
         """
@@ -427,9 +428,10 @@ secrets.yaml
                     logger.warning(f"git log failed, using iter_commits fallback: {e2}")
                     total_commits = len(list(self.repo.iter_commits('HEAD', max_count=1000)))
             
-            # Keep 20 commits when we reach 30 (max_backups)
-            # This provides a buffer before next cleanup
-            commits_to_keep_count = 20
+            # Keep (max_backups - 10) commits when we reach max_backups
+            # This provides a buffer of 10 commits before next cleanup
+            # For max_backups=30, this keeps 20 commits
+            commits_to_keep_count = max(10, self.max_backups - 10)  # Minimum 10 commits, buffer of 10
             
             if total_commits < self.max_backups:
                 return  # No cleanup needed yet
