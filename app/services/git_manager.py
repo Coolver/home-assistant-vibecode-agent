@@ -422,8 +422,15 @@ secrets.yaml
                 self.repo.git.branch('-m', current_branch)
                 self.repo.git.checkout(current_branch)
                 
-                # Count commits in current branch BEFORE gc (should be commits_to_keep_count)
-                commits_after = len(list(self.repo.iter_commits(current_branch)))
+                # Count commits in current branch using git rev-list (more accurate)
+                # This counts only commits reachable from current branch HEAD
+                try:
+                    rev_list_output = self.repo.git.rev_list('--count', current_branch)
+                    commits_after = int(rev_list_output.strip())
+                except Exception as count_error:
+                    # Fallback to iter_commits if rev-list fails
+                    logger.warning(f"rev-list count failed: {count_error}. Using iter_commits fallback.")
+                    commits_after = len(list(self.repo.iter_commits(current_branch)))
                 
                 # Use simpler gc without aggressive pruning to avoid OOM
                 # This removes dangling objects (old unreachable commits)
@@ -434,11 +441,15 @@ secrets.yaml
                     logger.warning(f"git gc failed: {gc_error}. Trying simpler cleanup...")
                     self.repo.git.prune('--expire=now')
                 
-                # Verify count after gc (should be the same)
-                commits_after_gc = len(list(self.repo.iter_commits(current_branch)))
-                if commits_after_gc != commits_after:
-                    logger.warning(f"Commit count changed after gc: {commits_after} → {commits_after_gc}")
-                    commits_after = commits_after_gc
+                # Verify count after gc using rev-list (should be the same)
+                try:
+                    rev_list_output_gc = self.repo.git.rev_list('--count', current_branch)
+                    commits_after_gc = int(rev_list_output_gc.strip())
+                    if commits_after_gc != commits_after:
+                        logger.warning(f"Commit count changed after gc: {commits_after} → {commits_after_gc}")
+                        commits_after = commits_after_gc
+                except:
+                    pass  # If rev-list fails, use previous count
                 
                 logger.info(f"✅ Automatic cleanup complete: {total_commits} → {commits_after} commits. Removed {total_commits - commits_after} old commits.")
                 
