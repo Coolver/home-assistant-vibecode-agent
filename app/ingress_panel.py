@@ -17,9 +17,23 @@ def generate_ingress_html(api_key: str, agent_version: str) -> str:
     Returns:
         Rendered HTML string
     """
-    # Full JSON config for user to copy
-    json_config = f'''{{
+    # Cursor JSON config for user to copy
+    cursor_json_config = f'''{{
   "mcpServers": {{
+    "home-assistant": {{
+      "command": "npx",
+      "args": ["-y", "@coolver/home-assistant-mcp@latest"],
+      "env": {{
+        "HA_AGENT_URL": "http://homeassistant.local:8099",
+        "HA_AGENT_KEY": "{api_key}"
+      }}
+    }}
+  }}
+}}'''
+    
+    # VS Code + Copilot JSON config for user to copy (wrapped in servers object)
+    vscode_json_config = f'''{{
+  "servers": {{
     "home-assistant": {{
       "command": "npx",
       "args": ["-y", "@coolver/home-assistant-mcp@latest"],
@@ -40,7 +54,8 @@ def generate_ingress_html(api_key: str, agent_version: str) -> str:
     html = template.render(
         api_key=api_key,
         agent_version=agent_version,
-        json_config=json_config
+        cursor_json_config=cursor_json_config,
+        vscode_json_config=vscode_json_config
     )
     
     return html

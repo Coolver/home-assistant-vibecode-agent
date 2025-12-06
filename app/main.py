@@ -1,6 +1,6 @@
 """
-HA Cursor Agent - FastAPI Application
-Enables Cursor AI to manage Home Assistant configuration
+HA Vibecode Agent - FastAPI Application
+Enables AI assistants (Cursor AI, VS Code + Copilot) to manage Home Assistant configuration
 """
 import os
 import logging
@@ -23,12 +23,12 @@ LOG_LEVEL = os.getenv('LOG_LEVEL', 'info').upper()
 logger = setup_logger('ha_cursor_agent', LOG_LEVEL)
 
 # Agent version
-AGENT_VERSION = "2.9.17"
+AGENT_VERSION = "2.10.0"
 
 # FastAPI app
 app = FastAPI(
-    title="HA Cursor Agent API",
-    description="AI Agent API for Home Assistant - enables Cursor AI to manage HA configuration",
+    title="HA Vibecode Agent API",
+    description="AI Agent API for Home Assistant - enables AI assistants (Cursor AI, VS Code + Copilot) to manage HA configuration",
     version=AGENT_VERSION,
     docs_url="/docs",
     redoc_url="/redoc"
@@ -86,8 +86,8 @@ async def send_notification(api_key: str):
                     'Content-Type': 'application/json'
                 },
                 json={
-                    'message': f'**HA Cursor Agent - Agent Key Generated:**\n\n`{api_key}`\n\nView anytime: Settings → Add-ons → HA Cursor Agent → Open Web UI',
-                    'title': '🔑 HA Cursor Agent API Key',
+                    'message': f'**HA Vibecode Agent - Agent Key Generated:**\n\n`{api_key}`\n\nView anytime: Settings → Add-ons → HA Vibecode Agent → Open Web UI',
+                    'title': '🔑 HA Vibecode Agent API Key',
                     'notification_id': 'ha_cursor_agent_key'
                 },
                 timeout=aiohttp.ClientTimeout(total=10)
@@ -164,7 +164,7 @@ supervisor_token_status = "PRESENT" if SUPERVISOR_TOKEN else "MISSING"
 dev_token_status = "PRESENT" if DEV_TOKEN else "MISSING"
 
 logger.info(f"=================================")
-logger.info(f"HA Cursor Agent v{AGENT_VERSION}")
+logger.info(f"HA Vibecode Agent v{AGENT_VERSION}")
 logger.info(f"=================================")
 logger.info(f"SUPERVISOR_TOKEN: {supervisor_token_status}")
 if SUPERVISOR_TOKEN:
@@ -283,7 +283,7 @@ async def old_ingress_panel():
     <!DOCTYPE html>
     <html>
     <head>
-        <title>HA Cursor Agent - API Key</title>
+        <title>HA Vibecode Agent - API Key</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
             * {{
@@ -486,7 +486,7 @@ async def old_ingress_panel():
     <body>
         <div class="container">
             <h1>
-                🔑 HA Cursor Agent
+                🔑 HA Vibecode Agent
                 <span class="version">v{AGENT_VERSION}</span>
             </h1>
             

@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>HA Cursor Agent</title>
+    <meta charset="UTF-8">
+    <title>HA Vibecode Agent</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         * {
@@ -246,45 +247,230 @@
                 opacity: 1;
             }
         }
+        
+        /* SVG Icon Styles */
+        .icon {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+            fill: currentColor;
+            flex-shrink: 0;
+        }
+        
+        .icon-lg {
+            width: 1.2em;
+            height: 1.2em;
+        }
+        
+        .icon-sm {
+            width: 0.9em;
+            height: 0.9em;
+        }
+        
+        h1 .icon,
+        h2 .icon {
+            width: 1.1em;
+            height: 1.1em;
+        }
+        
+        .copy-btn .icon,
+        .btn-regenerate .icon {
+            width: 1em;
+            height: 1em;
+        }
+        
+        .success-message .icon {
+            width: 1.2em;
+            height: 1.2em;
+            margin-right: 8px;
+        }
+        
+        /* Hide SVG icons when they should be replaced dynamically */
+        .icon-replaceable {
+            display: inline-block;
+        }
+        
+        /* Loading animation for refresh icon */
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        /* Tabs Styles */
+        .tabs-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid #30363d;
+            padding-bottom: 0;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: #8b949e;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 16px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: -2px;
+        }
+        
+        .tab:hover {
+            color: #c9d1d9;
+            background: rgba(88, 166, 255, 0.1);
+        }
+        
+        .tab.active {
+            color: #58a6ff;
+            border-bottom-color: #58a6ff;
+        }
+        
+        .tab svg {
+            width: 1.1em;
+            height: 1.1em;
+        }
+        
+        .content-section {
+            display: none;
+        }
+        
+        .content-section.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>
-            🔑 HA Cursor Agent
+            <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M17 7h-4v2h4c1.65 0 3 1.35 3 3s-1.35 3-3 3h-4v2h4c2.76 0 5-2.24 5-5s-2.24-5-5-5zm-6 8H7c-1.65 0-3-1.35-3-3s1.35-3 3-3h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-2zm-3-4h8v2H8v-2z"/>
+            </svg>
+            HA Vibecode Agent
             <span class="version">v{{ agent_version }}</span>
         </h1>
         
         <p style="color: #8b949e; margin: 10px 0 20px 0;">
-            Connect Cursor AI to your Home Assistant
+            Connect AI to your Home Assistant
         </p>
         
+        <div class="tabs-container">
+            <button class="tab active" id="tab-cursor" onclick="switchTab('cursor')">
+                <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17 7h-4v2h4c1.65 0 3 1.35 3 3s-1.35 3-3 3h-4v2h4c2.76 0 5-2.24 5-5s-2.24-5-5-5zm-6 8H7c-1.65 0-3-1.35-3-3s1.35-3 3-3h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-2zm-3-4h8v2H8v-2z"/>
+                </svg>
+                Cursor
+            </button>
+            <button class="tab" id="tab-vscode" onclick="switchTab('vscode')">
+                <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17 7h-4v2h4c1.65 0 3 1.35 3 3s-1.35 3-3 3h-4v2h4c2.76 0 5-2.24 5-5s-2.24-5-5-5zm-6 8H7c-1.65 0-3-1.35-3-3s1.35-3 3-3h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-2zm-3-4h8v2H8v-2z"/>
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" opacity="0.3"/>
+                </svg>
+                VS Code + Copilot
+            </button>
+        </div>
+        
+        <!-- Cursor Content Section -->
+        <div id="cursor-content" class="content-section active">
         <div class="card">
-            <h2>📋 Step 1: Copy Configuration</h2>
+            <h2>
+                <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17 7h-4v2h4c1.65 0 3 1.35 3 3s-1.35 3-3 3h-4v2h4c2.76 0 5-2.24 5-5s-2.24-5-5-5zm-6 8H7c-1.65 0-3-1.35-3-3s1.35-3 3-3h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-2zm-3-4h8v2H8v-2z"/>
+                </svg>
+                Step 1: Install Cursor
+            </h2>
+            
+            <div class="step">
+                <div class="step-content">
+                    <h3>Download and Install Cursor</h3>
+                    <p>Download and install <a href="https://cursor.com/" target="_blank" style="color: #58a6ff; text-decoration: none;"><strong>Cursor</strong></a> from the official website if you haven't already.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>
+                <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                Step 2: Install Node.js
+            </h2>
+            
+            <div class="step">
+                <div class="step-content">
+                    <h3>Install Node.js</h3>
+                    <p>The MCP server requires Node.js to run. If you don't have it installed:</p>
+                    <ul style="margin-left: 20px; margin-top: 8px; color: #8b949e;">
+                        <li>Download and install from <a href="https://nodejs.org/" target="_blank" style="color: #58a6ff; text-decoration: none;"><strong>nodejs.org</strong></a></li>
+                        <li>Verify installation by opening a terminal and running: <code>node --version</code></li>
+                        <li>You should see version <strong>v18.0.0</strong> or higher</li>
+                    </ul>
+                    <p style="margin-top: 8px;"><strong>Important:</strong> Install Node.js on the computer where Cursor is running, not on the Home Assistant server.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>
+                <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19 2h-4.18C14.4.84 13.3 0 12 0c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm7 18H5V4h2v3h10V4h2v16z"/>
+                </svg>
+                Step 3: Copy Configuration
+            </h2>
             <p style="color: #8b949e; margin-bottom: 16px;">
                 This is your complete Cursor MCP configuration.
             </p>
             
             <div class="info-box warning" style="margin-bottom: 16px;">
-                <strong>⚠️ Security Notice:</strong> This configuration contains your Agent Key. Keep it safe and never commit it to public repositories!
+                <strong>
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="margin-right: 4px;">
+                        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                    </svg>
+                    Security Notice:
+                </strong> This configuration contains your Agent Key. Keep it safe and never commit it to public repositories!
             </div>
             
             <div class="config-block">
-                <pre id="configText">{{ json_config }}</pre>
+                <pre id="cursorConfigText">{{ cursor_json_config }}</pre>
             </div>
             
             <div style="display: flex; gap: 12px; flex-wrap: wrap;">
                 <button class="copy-btn" id="copyBtn" onclick="copyConfig()" style="flex: 1;">
-                    <span id="copyBtnIcon">📋</span> <span id="copyBtnText">Copy Configuration</span>
+                    <span id="copyBtnIcon" class="icon-replaceable">
+                        <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M19 2h-4.18C14.4.84 13.3 0 12 0c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm7 18H5V4h2v3h10V4h2v16z"/>
+                        </svg>
+                    </span>
+                    <span id="copyBtnText">Copy Configuration</span>
                 </button>
                 <button class="btn-regenerate" id="regenerateBtn" onclick="confirmRegenerate()">
-                    <span id="regenIcon">🔄</span> <span id="regenText">Regenerate Key</span>
+                    <span id="regenIcon" class="icon-replaceable">
+                        <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                        </svg>
+                    </span>
+                    <span id="regenText">Regenerate Key</span>
                 </button>
             </div>
         </div>
         
         <div class="card">
-            <h2>🚀 Step 2: Setup Cursor</h2>
+            <h2>
+                <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                </svg>
+                Step 4: Setup Cursor
+            </h2>
             
             <div class="step">
                 <div class="step-number">1</div>
@@ -298,7 +484,7 @@
                 <div class="step-number">2</div>
                 <div class="step-content">
                     <h3>Add Custom MCP Server</h3>
-                    <p>Click <strong>Add a Custom MCP Server</strong> and paste the JSON configuration you copied above</p>
+                    <p>Click <strong>Add a Custom MCP Server</strong> and paste the JSON configuration you copied in Step 3</p>
                 </div>
             </div>
             
@@ -319,37 +505,272 @@
             </div>
         </div>
         
-        <div class="card">
-            <h2>📚 Resources</h2>
-            <ul style="margin-left: 20px; color: #8b949e;">
-                <li><a href="/docs" target="_blank" style="color: #58a6ff; text-decoration: none;">API Documentation</a></li>
-                <li><a href="https://github.com/Coolver/home-assistant-cursor-agent" target="_blank" style="color: #58a6ff; text-decoration: none;">GitHub Repository</a></li>
-                <li><a href="https://www.npmjs.com/package/@coolver/home-assistant-mcp" target="_blank" style="color: #58a6ff; text-decoration: none;">MCP Package</a></li>
-            </ul>
+        <div class="card" style="background: linear-gradient(135deg, #1c2128 0%, #161b22 100%); border: 2px solid #238636;">
+            <h2 style="color: #58a6ff; display: flex; align-items: center; gap: 8px;">
+                    <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 1.2em; height: 1.2em;">
+                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                    </svg>
+                Support the Project
+            </h2>
+            <p style="color: #8b949e; margin-bottom: 16px;">
+                If you find this project useful and want to see it continue to evolve, please consider giving it a star on GitHub!
+            </p>
+            <a href="https://github.com/Coolver/home-assistant-cursor-agent" target="_blank" style="text-decoration: none; display: inline-block;">
+                <button class="copy-btn" style="background: #238636; width: 100%; justify-content: center;">
+                    <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 1em; height: 1em;">
+                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="currentColor"/>
+                    </svg>
+                    <span>Star on GitHub</span>
+                </button>
+            </a>
         </div>
+        </div>
+        <!-- End Cursor Content Section -->
+        
+        <!-- VS Code + Copilot Content Section -->
+        <div id="vscode-content" class="content-section">
+        <div class="card">
+            <h2>
+                <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0L19.2 12l-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>
+                </svg>
+                Step 1: Install VS Code + Copilot
+            </h2>
+            
+            <div class="step">
+                <div class="step-content">
+                    <h3>Install GitHub Copilot</h3>
+                    <p>Make sure <a href="https://code.visualstudio.com/" target="_blank" style="color: #58a6ff; text-decoration: none;"><strong>VS Code</strong></a> is installed, then install the <a href="https://marketplace.visualstudio.com/items?itemName=GitHub.copilot" target="_blank" style="color: #58a6ff; text-decoration: none;"><strong>GitHub Copilot</strong></a> extension. <a href="https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat" target="_blank" style="color: #58a6ff; text-decoration: none;"><strong>Copilot Chat</strong></a> is automatically included with GitHub Copilot and required for MCP server integration.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>
+                <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                Step 2: Install Node.js
+            </h2>
+            
+            <div class="step">
+                <div class="step-content">
+                    <h3>Install Node.js</h3>
+                    <p>The MCP server requires Node.js to run. If you don't have it installed:</p>
+                    <ul style="margin-left: 20px; margin-top: 8px; color: #8b949e;">
+                        <li>Download and install from <a href="https://nodejs.org/" target="_blank" style="color: #58a6ff; text-decoration: none;"><strong>nodejs.org</strong></a></li>
+                        <li>Verify installation by opening a terminal and running: <code>node --version</code></li>
+                        <li>You should see version <strong>v18.0.0</strong> or higher</li>
+                    </ul>
+                    <p style="margin-top: 8px;"><strong>Important:</strong> Install Node.js on the computer where VS Code is running, not on the Home Assistant server.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>
+                <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19 2h-4.18C14.4.84 13.3 0 12 0c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm7 18H5V4h2v3h10V4h2v16z"/>
+                </svg>
+                Step 3: Copy Configuration
+            </h2>
+            <p style="color: #8b949e; margin-bottom: 16px;">
+                This is your VS Code + Copilot MCP server configuration.
+            </p>
+            
+            <div class="info-box warning" style="margin-bottom: 16px;">
+                <strong>
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="margin-right: 4px;">
+                        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                    </svg>
+                    Security Notice:
+                </strong> This configuration contains your Agent Key. Keep it safe and never commit it to public repositories!
+            </div>
+            
+            <div class="config-block">
+                <pre id="vscodeConfigText">{{ vscode_json_config }}</pre>
+            </div>
+            
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button class="copy-btn" id="vscodeCopyBtn" onclick="copyConfig()" style="flex: 1;">
+                    <span id="vscodeCopyBtnIcon" class="icon-replaceable">
+                        <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M19 2h-4.18C14.4.84 13.3 0 12 0c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm7 18H5V4h2v3h10V4h2v16z"/>
+                        </svg>
+                    </span>
+                    <span id="vscodeCopyBtnText">Copy Configuration</span>
+                </button>
+                <button class="btn-regenerate" id="vscodeRegenerateBtn" onclick="confirmRegenerate()">
+                    <span id="vscodeRegenIcon" class="icon-replaceable">
+                        <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                        </svg>
+                    </span>
+                    <span id="vscodeRegenText">Regenerate Key</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>
+                <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2.81 14.12L5.64 11.3l-1.41-1.42L1.4 12.7c-.39.39-.39 1.02 0 1.41l2.41 2.41zm16.78-1.42l-2.41-2.41c-.39-.39-1.02-.39-1.41 0l-1.42 1.41 3.83 3.83 1.42-1.41c.39-.39.39-1.02 0-1.42zm-1.42-5.29l-3.83-3.83-1.42 1.41c-.39.39-.39 1.02 0 1.41l2.41 2.41 1.42-1.41zm-5.17 0L9.88 7.15l-3.83 3.83 1.42 1.41 3.83-3.83zm-1.42-1.42L8.46 3.7c-.39-.39-1.02-.39-1.41 0L4.64 6.11l3.83 3.83 1.42-1.41zM22.6 4.7l-2.41-2.41c-.39-.39-1.02-.39-1.41 0l-1.42 1.41 3.83 3.83 1.41-1.41c.39-.39.39-1.02 0-1.42z"/>
+                </svg>
+                Step 4: Setup VS Code - Add MCP Server
+            </h2>
+            
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h3>Open MCP User Configuration</h3>
+                    <p>Open the <strong>Command Palette</strong> in VS Code:</p>
+                    <p style="margin-top: 8px;">
+                        <code>Ctrl+Shift+P</code> (Windows / Linux)<br>
+                        <code>Cmd+Shift+P</code> (macOS)
+                    </p>
+                    <p style="margin-top: 8px;">Type: <strong>MCP: Open User Configuration</strong></p>
+                    <p>Click it – this will open the MCP configuration file.</p>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h3>Paste Configuration</h3>
+                    <p>In the opened configuration file (<code>mcp.json</code>), you will see an empty configuration:</p>
+                    <div style="margin: 12px 0; padding: 12px; background: #0d1117; border: 2px solid #30363d; border-radius: 6px;">
+                        <pre style="margin: 0; color: #79c0ff; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace; font-size: 12px;">{
+  "servers": {}
+}</pre>
+                    </div>
+                    <p style="margin-top: 12px;">The file will be open in VS Code editor with the cursor positioned inside the empty <code>servers</code> object. Paste the configuration you copied in Step 3 into this file, replacing the empty <code>servers</code> object, and save the file (Cmd+S / Ctrl+S).</p>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">5</div>
+                <div class="step-content">
+                    <h3>Allow Server in Copilot Chat</h3>
+                    <p>Open <a href="https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat" target="_blank" style="color: #58a6ff; text-decoration: none;"><strong>GitHub Copilot Chat</strong></a> in VS Code (side panel with the Copilot icon).</p>
+                    <p style="margin-top: 8px;">Start a new chat. In the tools / MCP section you should now see a server called <code>home-assistant</code>.</p>
+                    <p style="margin-top: 8px;">If Copilot asks whether it's allowed to use this tool/server, click <strong>Allow</strong>.</p>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">6</div>
+                <div class="step-content">
+                    <h3>Test Connection</h3>
+                    <p>Ask Copilot Chat: <em>"Use the home-assistant tools to list my Home Assistant entities"</em></p>
+                    <p style="margin-top: 8px; color: #8b949e; font-size: 13px;">Or try: <em>"Ask the home-assistant MCP server to inspect my current automations"</em></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card" style="background: linear-gradient(135deg, #1c2128 0%, #161b22 100%); border: 2px solid #238636;">
+            <h2 style="color: #58a6ff; display: flex; align-items: center; gap: 8px;">
+                <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 1.2em; height: 1.2em;">
+                    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                </svg>
+                Support the Project
+            </h2>
+            <p style="color: #8b949e; margin-bottom: 16px;">
+                If you find this project useful and want to see it continue to evolve, please consider giving it a star on GitHub!
+            </p>
+            <a href="https://github.com/Coolver/home-assistant-cursor-agent" target="_blank" style="text-decoration: none; display: inline-block; width: 100%;">
+                <button class="copy-btn" style="background: #238636; width: 100%; justify-content: center;">
+                    <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 1em; height: 1em;">
+                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="currentColor"/>
+                    </svg>
+                    <span>Star on GitHub</span>
+                </button>
+            </a>
+        </div>
+        </div>
+        <!-- End VS Code + Copilot Content Section -->
     </div>
     
     <div class="success-message" id="successMessage">
-        ✅ Copied to Clipboard!
+        <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+        </svg>
+        Copied to Clipboard!
     </div>
     
     <script>
-        let fullConfig = `{{ json_config }}`;
+        let currentTab = 'cursor';
+        let cursorConfig = `{{ cursor_json_config }}`;
+        let vscodeConfig = `{{ vscode_json_config }}`;
         let fullKey = "{{ api_key }}";
         
+        // Tab switching function
+        function switchTab(tabName) {
+            currentTab = tabName;
+            
+            // Update tab buttons
+            document.getElementById('tab-cursor').classList.toggle('active', tabName === 'cursor');
+            document.getElementById('tab-vscode').classList.toggle('active', tabName === 'vscode');
+            
+            // Update content sections
+            document.getElementById('cursor-content').classList.toggle('active', tabName === 'cursor');
+            document.getElementById('vscode-content').classList.toggle('active', tabName === 'vscode');
+            
+            // Save preference to localStorage
+            localStorage.setItem('ha-agent-tab', tabName);
+        }
+        
+        // Load saved tab preference on page load
+        // By default, Cursor tab is active (set in HTML with class="active")
+        window.addEventListener('DOMContentLoaded', function() {
+            const savedTab = localStorage.getItem('ha-agent-tab');
+            // Only switch to VS Code if user explicitly selected it
+            // For first-time visitors or if savedTab is 'cursor' or null, keep default (Cursor)
+            if (savedTab === 'vscode') {
+                switchTab('vscode');
+            }
+            // Otherwise, Cursor tab remains active (as set in HTML)
+        });
+        
+        // SVG Icon functions
+        function getIconSVG(iconName) {
+            const icons = {
+                'clipboard': '<svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 2h-4.18C14.4.84 13.3 0 12 0c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm7 18H5V4h2v3h10V4h2v16z"/></svg>',
+                'check': '<svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
+                'error': '<svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>',
+                'refresh': '<svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>',
+                'loading': '<svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="animation: spin 1s linear infinite;"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>',
+                'warning': '<svg class="icon icon-sm" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>'
+            };
+            return icons[iconName] || '';
+        }
+        
+        function setIcon(element, iconName) {
+            if (element) {
+                element.innerHTML = getIconSVG(iconName);
+            }
+        }
+        
         function copyConfig() {
-            const btn = document.getElementById('copyBtn');
-            const btnIcon = document.getElementById('copyBtnIcon');
-            const btnText = document.getElementById('copyBtnText');
+            // Get the correct config and button elements based on active tab
+            const config = currentTab === 'cursor' ? cursorConfig : vscodeConfig;
+            const btn = currentTab === 'cursor' 
+                ? document.getElementById('copyBtn')
+                : document.getElementById('vscodeCopyBtn');
+            const btnIcon = currentTab === 'cursor'
+                ? document.getElementById('copyBtnIcon')
+                : document.getElementById('vscodeCopyBtnIcon');
+            const btnText = currentTab === 'cursor'
+                ? document.getElementById('copyBtnText')
+                : document.getElementById('vscodeCopyBtnText');
             
             try {
                 // Try modern Clipboard API first
                 if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(fullConfig).then(() => {
+                    navigator.clipboard.writeText(config).then(() => {
                         showCopiedState(btn, btnIcon, btnText);
                     }).catch(err => {
                         // Fallback to legacy method
-                        if (copyToClipboardFallback(fullConfig)) {
+                        if (copyToClipboardFallback(config)) {
                             showCopiedState(btn, btnIcon, btnText);
                         } else {
                             showErrorState(btn, btnIcon, btnText, err);
@@ -357,7 +778,7 @@
                     });
                 } else {
                     // Use legacy method directly
-                    if (copyToClipboardFallback(fullConfig)) {
+                    if (copyToClipboardFallback(config)) {
                         showCopiedState(btn, btnIcon, btnText);
                     } else {
                         showErrorState(btn, btnIcon, btnText, 'Clipboard API not available');
@@ -392,7 +813,7 @@
         function showCopiedState(btn, btnIcon, btnText) {
             // Change button appearance
             btn.classList.add('copied');
-            btnIcon.textContent = '✅';
+            setIcon(btnIcon, 'check');
             btnText.textContent = 'Copied!';
             
             // Show center popup
@@ -401,14 +822,14 @@
             // Reset button after 2 seconds
             setTimeout(() => {
                 btn.classList.remove('copied');
-                btnIcon.textContent = '📋';
+                setIcon(btnIcon, 'clipboard');
                 btnText.textContent = 'Copy Configuration';
             }, 2000);
         }
         
         function showErrorState(btn, btnIcon, btnText, error) {
             // Error state
-            btnIcon.textContent = '❌';
+            setIcon(btnIcon, 'error');
             btnText.textContent = 'Failed to copy';
             console.error('Copy failed:', error);
             
@@ -417,7 +838,7 @@
             
             // Reset after 3 seconds
             setTimeout(() => {
-                btnIcon.textContent = '📋';
+                setIcon(btnIcon, 'clipboard');
                 btnText.textContent = 'Copy Configuration';
             }, 3000);
         }
@@ -431,20 +852,190 @@
         }
         
         function confirmRegenerate() {
-            if (confirm('⚠️ Regenerate API Key?\\n\\nThis will invalidate your current key. Your Cursor configuration will stop working until you update ~/.cursor/mcp.json with the new key.\\n\\nContinue?')) {
+            if (confirm('Regenerate API Key?\\n\\nThis will invalidate your current key. Your Cursor configuration will stop working until you update ~/.cursor/mcp.json with the new key.\\n\\nContinue?')) {
                 regenerateKey();
             }
         }
         
+        function copyVSCodeKey() {
+            const keyInput = document.getElementById('vscodeApiKey');
+            const btn = document.getElementById('vscodeKeyCopyIcon').parentElement;
+            const btnIcon = document.getElementById('vscodeKeyCopyIcon');
+            const btnText = document.getElementById('vscodeKeyCopyText');
+            const key = keyInput.value;
+            
+            try {
+                // Try modern Clipboard API first
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(key).then(() => {
+                        // Show copied state
+                        btn.classList.add('copied');
+                        setIcon(btnIcon, 'check');
+                        btnText.textContent = 'Copied!';
+                        showSuccess();
+                        
+                        // Reset button after 2 seconds
+                        setTimeout(() => {
+                            btn.classList.remove('copied');
+                            setIcon(btnIcon, 'clipboard');
+                            btnText.textContent = 'Copy';
+                        }, 2000);
+                    }).catch(err => {
+                        // Fallback to legacy method
+                        if (copyToClipboardFallback(key)) {
+                            btn.classList.add('copied');
+                            setIcon(btnIcon, 'check');
+                            btnText.textContent = 'Copied!';
+                            showSuccess();
+                            setTimeout(() => {
+                                btn.classList.remove('copied');
+                                setIcon(btnIcon, 'clipboard');
+                                btnText.textContent = 'Copy';
+                            }, 2000);
+                        } else {
+                            setIcon(btnIcon, 'error');
+                            btnText.textContent = 'Failed';
+                            setTimeout(() => {
+                                setIcon(btnIcon, 'clipboard');
+                                btnText.textContent = 'Copy';
+                            }, 3000);
+                        }
+                    });
+                } else {
+                    // Use legacy method directly
+                    if (copyToClipboardFallback(key)) {
+                        btn.classList.add('copied');
+                        setIcon(btnIcon, 'check');
+                        btnText.textContent = 'Copied!';
+                        showSuccess();
+                        setTimeout(() => {
+                            btn.classList.remove('copied');
+                            setIcon(btnIcon, 'clipboard');
+                            btnText.textContent = 'Copy';
+                        }, 2000);
+                    } else {
+                        setIcon(btnIcon, 'error');
+                        btnText.textContent = 'Failed';
+                        setTimeout(() => {
+                            setIcon(btnIcon, 'clipboard');
+                            btnText.textContent = 'Copy';
+                        }, 3000);
+                    }
+                }
+            } catch (err) {
+                setIcon(btnIcon, 'error');
+                btnText.textContent = 'Failed';
+                setTimeout(() => {
+                    setIcon(btnIcon, 'clipboard');
+                    btnText.textContent = 'Copy';
+                }, 3000);
+            }
+        }
+        
+        async function regenerateKeyForVSCode() {
+            const btn = document.getElementById('vscodeKeyRegenIcon').parentElement;
+            const icon = document.getElementById('vscodeKeyRegenIcon');
+            const text = document.getElementById('vscodeKeyRegenText');
+            const keyInput = document.getElementById('vscodeApiKey');
+            
+            // Show loading state
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            icon.innerHTML = getIconSVG('loading');
+            text.textContent = 'Regenerating...';
+            
+            try {
+                const response = await fetch('api/regenerate-key', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    throw new Error('Response is not JSON: ' + text.substring(0, 100));
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update key in input field
+                    fullKey = result.new_key;
+                    keyInput.value = result.new_key;
+                    
+                    // Update both configs
+                    cursorConfig = cursorConfig.replace(
+                        /"HA_AGENT_KEY": ".*?"/,
+                        `"HA_AGENT_KEY": "${result.new_key}"`
+                    );
+                    vscodeConfig = vscodeConfig.replace(
+                        /"HA_AGENT_KEY": ".*?"/,
+                        `"HA_AGENT_KEY": "${result.new_key}"`
+                    );
+                    
+                    // Update cursor config display if visible
+                    if (document.getElementById('cursorConfigText')) {
+                        document.getElementById('cursorConfigText').textContent = cursorConfig;
+                    }
+                    
+                    // Show success
+                    icon.innerHTML = getIconSVG('check');
+                    text.textContent = 'Regenerated!';
+                    btn.style.background = '#238636';
+                    
+                    // Show popup
+                    showSuccess();
+                    
+                    // Reset button after 2 seconds
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.style.opacity = '';
+                        btn.style.background = '';
+                        icon.innerHTML = getIconSVG('refresh');
+                        text.textContent = 'Regenerate';
+                    }, 2000);
+                    
+                } else {
+                    throw new Error(result.message);
+                }
+                
+            } catch (error) {
+                console.error('Regeneration failed:', error);
+                icon.innerHTML = getIconSVG('error');
+                text.textContent = 'Failed!';
+                
+                alert('Failed to regenerate key:\\n' + error.message + '\\n\\nTry again or check agent logs.');
+                
+                // Reset button
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.style.opacity = '';
+                    icon.innerHTML = getIconSVG('refresh');
+                    text.textContent = 'Regenerate';
+                }, 3000);
+            }
+        }
+        
         async function regenerateKey() {
-            const btn = document.getElementById('regenerateBtn');
-            const icon = document.getElementById('regenIcon');
-            const text = document.getElementById('regenText');
+            // Get the correct button elements based on active tab
+            const btn = currentTab === 'cursor'
+                ? document.getElementById('regenerateBtn')
+                : document.getElementById('vscodeRegenerateBtn');
+            const icon = currentTab === 'cursor'
+                ? document.getElementById('regenIcon')
+                : document.getElementById('vscodeRegenIcon');
+            const text = currentTab === 'cursor'
+                ? document.getElementById('regenText')
+                : document.getElementById('vscodeRegenText');
             
             // Show loading state
             btn.classList.add('regenerating');
             btn.disabled = true;
-            icon.textContent = '⏳';
+            setIcon(icon, 'loading');
             text.textContent = 'Regenerating...';
             
             try {
@@ -467,29 +1058,36 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Update fullKey and fullConfig with new key
+                    // Update fullKey and both configs with new key
                     fullKey = result.new_key;
                     
-                    // Update config text with new key
-                    const newConfig = fullConfig.replace(
+                    // Update cursor config
+                    cursorConfig = cursorConfig.replace(
                         /"HA_AGENT_KEY": ".*?"/,
                         `"HA_AGENT_KEY": "${result.new_key}"`
                     );
-                    fullConfig = newConfig;
-                    document.getElementById('configText').textContent = newConfig;
+                    document.getElementById('cursorConfigText').textContent = cursorConfig;
                     
+                    // Update vscode config
+                    vscodeConfig = vscodeConfig.replace(
+                        /"HA_AGENT_KEY": ".*?"/,
+                        `"HA_AGENT_KEY": "${result.new_key}"`
+                    );
+                    document.getElementById('vscodeConfigText').textContent = vscodeConfig;
                     
                     // Show success
-                    icon.textContent = '✅';
+                    setIcon(icon, 'check');
                     text.textContent = 'Key Regenerated!';
                     btn.style.background = '#238636';
                     
                     // Show popup
                     showSuccess();
                     
-                    // Alert user to update Cursor
+                    // Alert user to update configuration
+                    const editorName = currentTab === 'cursor' ? 'Cursor' : 'VS Code';
+                    const configPath = currentTab === 'cursor' ? '~/.cursor/mcp.json' : 'VS Code MCP settings';
                     setTimeout(() => {
-                        alert('✅ New API Key generated!\\n\\n⚠️ IMPORTANT:\\n1. Copy the new configuration (button above)\\n2. Update ~/.cursor/mcp.json with new key\\n3. Restart Cursor\\n\\nOld key is now invalid!');
+                        alert(`New API Key generated!\\n\\nIMPORTANT:\\n1. Copy the new configuration (button above)\\n2. Update ${configPath} with new key\\n3. Restart ${editorName}\\n\\nOld key is now invalid!`);
                     }, 500);
                     
                     // Reset button after 3 seconds
@@ -497,7 +1095,7 @@
                         btn.classList.remove('regenerating');
                         btn.disabled = false;
                         btn.style.background = '';
-                        icon.textContent = '🔄';
+                        setIcon(icon, 'refresh');
                         text.textContent = 'Regenerate Key';
                     }, 3000);
                     
@@ -507,16 +1105,16 @@
                 
             } catch (error) {
                 console.error('Regeneration failed:', error);
-                icon.textContent = '❌';
+                setIcon(icon, 'error');
                 text.textContent = 'Failed!';
                 
-                alert('❌ Failed to regenerate key:\\n' + error.message + '\\n\\nTry again or check agent logs.');
+                alert('Failed to regenerate key:\\n' + error.message + '\\n\\nTry again or check agent logs.');
                 
                 // Reset button
                 setTimeout(() => {
                     btn.classList.remove('regenerating');
                     btn.disabled = false;
-                    icon.textContent = '🔄';
+                    setIcon(icon, 'refresh');
                     text.textContent = 'Regenerate Key';
                 }, 3000);
             }

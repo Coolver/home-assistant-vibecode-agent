@@ -1,12 +1,12 @@
-# HA Cursor Agent - Home Assistant Add-on
+# HA Vibecode Agent - Home Assistant Add-on
 
-[![Version](https://img.shields.io/badge/version-2.9.17-blue.svg)](https://github.com/Coolver/home-assistant-cursor-agent)
+[![Version](https://img.shields.io/badge/version-2.10.0-blue.svg)](https://github.com/Coolver/home-assistant-cursor-agent)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![MCP Package](https://img.shields.io/npm/v/@coolver/home-assistant-mcp?label=MCP%20Package)](https://www.npmjs.com/package/@coolver/home-assistant-mcp)
 
 **Let AI build your Home Assistant automations - just describe what you want in natural language** 🏠🤖
 
-Transform your smart home management! This add-on enables Cursor AI to:
+Transform your smart home management! This add-on enables **Cursor AI**, **Visual Studio Code (VS Code)** or **your favourite IDE with MCP** support to:
 - 📝 Analyze your Home Assistant configuration and devices
 - 🏗️ Create intelligent automations, scripts, and complete systems
 - 🔍 Monitor and troubleshoot your setup through log analysis
@@ -26,7 +26,7 @@ https://github.com/user-attachments/assets/0df48019-06c0-48dd-82ad-c7fe0734ddb3
 
 ## 🎯 What is this?
 
-**HA Cursor Agent** is a Home Assistant Add-on that provides a **REST API** enabling AI assistants (like Cursor AI via [MCP protocol](https://github.com/Coolver/home-assistant-mcp)) to:
+**HA Vibecode Agent** is a Home Assistant Add-on that provides a **REST API** enabling AI assistants (like Cursor AI, VS Code or other IDEs via [MCP protocol](https://github.com/Coolver/home-assistant-mcp)) to:
 
 ### 🔍 Analyze Your Setup
 ✅ **Read entire configuration** - entities, automations, scripts, helpers  
@@ -65,7 +65,7 @@ https://github.com/user-attachments/assets/0df48019-06c0-48dd-82ad-c7fe0734ddb3
 - Check configuration validity
 - Real-time state monitoring
 
-### 🔌 Add-on Management (NEW in v2.3.0!) 🔥
+### 🔌 Add-on Management
 **Complete add-on lifecycle management - install, configure, and control services!**
 - Install/uninstall add-ons (Zigbee2MQTT, Node-RED, ESPHome, etc)
 - Configure add-on options
@@ -113,101 +113,37 @@ https://github.com/user-attachments/assets/0df48019-06c0-48dd-82ad-c7fe0734ddb3
 
 ## ⚡ Quick Start (5 minutes)
 
-### 1. Install Node.js (if not already installed)
-
-The MCP server requires Node.js to run on the machine where Cursor is installed.
-
-- Check if Node.js is already installed: open a terminal and run `node --version`.
-- If Node.js is not installed, or the version is below **v18.0.0**, download and install it from [nodejs.org](https://nodejs.org/).
-- After installation, verify it with `node --version` — it should show **v18.0.0** or higher.
-
-**Important:** Install Node.js on the computer where Cursor is running, **not** on the Home Assistant server.
-
-
-[YouTube Installation guide: how to install the Home Assistant Cursor Agent](https://youtu.be/RZNkNZnhMrc)
-  
-### 2. Add Repository
+### 1. Add Repository
 
 Open your **Home Assistant UI** (usually http://homeassistant.local:8123):
 
 1. Go to **Settings** → **Add-ons** → **Add-on Store** → **⋮** → **Repositories** (usually http://homeassistant.local:8123/hassio/dashboard )
-2. Add: `https://github.com/Coolver/home-assistant-cursor-agent`
+2. Add: `https://github.com/coolver/home-assistant-cursor-agent`
 3. Click **Add**
 
-### 3. Install and Start Add-on
+### 2. Install and Start Add-on
 
 Still in **Home Assistant UI**:
 
 1. Refresh the page
-2. Find **HA Cursor Agent** → Click **INSTALL**
+2. Find **HA Vibecode Agent** → Click **INSTALL**
 3. Wait for installation to complete
-4. Go to **Configuration** tab → Keep defaults → **SAVE**
-5. Go to **Info** tab → **Start on boot: ON** → **START**
-6. **Wait for startup** (~10 seconds)
+4. Enable → **Start on boot: ON** → and push **START** button
+5. **Wait for startup** (~10 seconds)
+6. Click **"Open Web UI"** button
 
-### 4. Setup MCP in Cursor
-
-**Get configuration from Home Assistant:**
-1. In **Home Assistant UI**, go to **Settings** → **Add-ons** → **HA Cursor Agent**
-2. Click **"Open Web UI"** button
-3. You'll see this interface:
+You'll see this interface:
 
 <p align="center">
-  <img src=".github/images/ingress-panel.jpg" alt="HA Cursor Agent Ingress Panel" width="700">
+  <img src=".github/images/ingress-panel.jpg" alt="HA Vibecode Agent Ingress Panel" width="700">
 </p>
 
-4. Click **"Copy Configuration to Clipboard"** button
-5. Configuration copied to clipboard! ✅
+7. Click the **Cursor** or **VS Code** tab (depending on which IDE you want to use with Home Assistant) and **follow the setup instructions**. You’ll need to install and configure Cursor or VS Code so they can connect to the HA Agent via the MCP protocol.
 
-**Add to Cursor AI:**
-1. Open **Cursor** editor
-2. Go to **Settings** (Cmd/Ctrl + ,)
-3. Click **Tools & MCP** in the sidebar
-4. Click **New MCP Server**
-5. **Paste** the configuration you copied
-6. Click **Save**
-7. **Restart Cursor** completely (Cmd/Ctrl + Q and reopen)
+8. That’s it — **you’re ready to start** working with your Home Assistant scripts, automations and dashboards using AI.
+If you find this project useful and want to support its development, **please consider giving it a [GitHub Star](https://github.com/Coolver/home-assistant-cursor-agent) ⭐**
 
-**For reference, here's what the configuration looks like:**
-
-```json
-{
-  "mcpServers": {
-    "home-assistant": {
-      "command": "npx",
-      "args": ["-y", "@coolver/home-assistant-mcp@latest"],
-      "env": {
-        "HA_AGENT_URL": "http://homeassistant.local:8099",
-        "HA_AGENT_KEY": "YOUR_API_KEY_HERE"
-      }
-    }
-  }
-}
-```
-
-**Note:** The Web UI provides this exact configuration ready to copy - no need to type it manually!
-
-Done! Cursor AI is now connected to your Home Assistant 🎉
-
-### 5. Test Connection
-
-**Test that everything works:**
-
-Open Cursor and send this message to AI:
-```
-Connect to my Home Assistant and show me:
-1. List of all my climate entities
-2. Current status of the HA Cursor Agent
-
-This will verify the MCP connection is working.
-```
-
-If AI successfully returns your entities and agent status, everything is working! ✅
-
-**Troubleshooting:** If connection fails, check:
-- Add-on is running in Home Assistant
-- Cursor was fully restarted
-- Configuration was pasted correctly
+[YouTube Installation guide: how to install the Home Assistant Cursor Agent](https://youtu.be/RZNkNZnhMrc)
 
 ---
 
@@ -306,7 +242,7 @@ With this add-on and [MCP integration](https://github.com/Coolver/home-assistant
 3. Select **Repositories**
 4. Add repository URL: `https://github.com/Coolver/home-assistant-cursor-agent`
 5. Click **Add**
-6. Refresh the page - find **HA Cursor Agent** in the list
+6. Refresh the page - find **HA Vibecode Agent** in the list
 7. Click **INSTALL**
 8. Configure and start
 
@@ -318,7 +254,7 @@ With this add-on and [MCP integration](https://github.com/Coolver/home-assistant
    - Supervisor → Add-on Store → ⋮ → Check for updates
 
 3. **Install the Add-on:**
-   - Find "HA Cursor Agent" in Local Add-ons
+   - Find "HA Vibecode Agent" in Local Add-ons
    - Click **INSTALL**
 
 4. **Configure:**
@@ -524,7 +460,7 @@ All API endpoints (except `/api/health`) require authentication.
 
 The add-on uses **Agent Key** authentication:
 
-1. Get your Agent Key from **Web UI** (Settings → Add-ons → HA Cursor Agent → Open Web UI)
+1. Get your Agent Key from **Web UI** (Settings → Add-ons → HA Vibecode Agent → Open Web UI)
 2. Configure in Cursor MCP settings with `HA_AGENT_KEY`
 3. Agent Key is auto-generated on first start
 
@@ -843,7 +779,7 @@ AI via Agent:
 
 ### Add-on won't start
 
-**Check logs:** Supervisor → HA Cursor Agent → Logs
+**Check logs:** Supervisor → HA Vibecode Agent → Logs
 
 Common issues:
 - Port 8099 already in use
@@ -853,7 +789,7 @@ Common issues:
 ### API returns 401 Unauthorized
 
 - Check Agent Key is correct
-- Regenerate key if needed: Settings → Add-ons → HA Cursor Agent → Open Web UI
+- Regenerate key if needed: Settings → Add-ons → HA Vibecode Agent → Open Web UI
 - Ensure Authorization header is present
 - Format: `Authorization: Bearer YOUR_AGENT_KEY`
 
