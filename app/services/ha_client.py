@@ -77,18 +77,18 @@ class HomeAssistantClient:
     
     async def call_service(self, domain: str, service: str, data: Dict) -> Dict:
         """Call a Home Assistant service"""
-        # Some services require return_response parameter (e.g., file.read_file)
-        # Remove return_response from data if present (it should be a query param, not in body)
+        # Some services require return_response parameter, but it should come from the caller
+        # We just need to ensure it's not in the body if it's meant to be a query param
         params = {}
         if domain == 'file' and service == 'read_file':
-            # Remove return_response from data dict if it's there (should be query param)
+            # Remove return_response from data dict if it's there (should be query param, not in body)
             if 'return_response' in data:
                 logger.info(f"ha_client: Removing return_response from data. Data keys before: {list(data.keys())}")
                 data = {k: v for k, v in data.items() if k != 'return_response'}
                 logger.info(f"ha_client: Data keys after: {list(data.keys())}")
-            # Home Assistant API expects return_response as query parameter
-            params['return_response'] = 'true'
-            logger.info(f"ha_client: Added return_response='true' to params. Data: {data}, Params: {params}")
+                # If return_response was in data, add it to params
+                params['return_response'] = 'true'
+                logger.info(f"ha_client: Moved return_response to params. Data: {data}, Params: {params}")
         
         endpoint = f"services/{domain}/{service}"
         logger.info(f"ha_client.call_service: endpoint={endpoint}, data={data}, params={params}")
