@@ -87,7 +87,8 @@ async def get_theme(
 @router.post("/create")
 async def create_theme(
     theme_name: str = Body(..., description="Theme name (without .yaml extension)"),
-    theme_config: Dict[str, Any] = Body(..., description="Theme configuration (CSS variables)")
+    theme_config: Dict[str, Any] = Body(..., description="Theme configuration (CSS variables)"),
+    commit_message: Optional[str] = Body(None, description="Custom commit message for Git backup")
 ):
     """
     Create a new theme
@@ -110,7 +111,8 @@ async def create_theme(
         
         # Write theme file
         file_path = f"themes/{theme_name}.yaml"
-        result = await file_manager.write_file(file_path, content)
+        commit_msg = commit_message or f"Create theme: {theme_name}"
+        result = await file_manager.write_file(file_path, content, commit_message=commit_msg)
         
         logger.info(f"Created theme: {theme_name}")
         return {
@@ -127,7 +129,8 @@ async def create_theme(
 @router.put("/update")
 async def update_theme(
     theme_name: str = Body(..., description="Theme name (without .yaml extension)"),
-    theme_config: Dict[str, Any] = Body(..., description="Theme configuration (CSS variables)")
+    theme_config: Dict[str, Any] = Body(..., description="Theme configuration (CSS variables)"),
+    commit_message: Optional[str] = Body(None, description="Custom commit message for Git backup")
 ):
     """
     Update an existing theme
@@ -157,7 +160,8 @@ async def update_theme(
         
         # Write theme file
         file_path = f"themes/{theme_name}.yaml"
-        result = await file_manager.write_file(file_path, content)
+        commit_msg = commit_message or f"Update theme: {theme_name}"
+        result = await file_manager.write_file(file_path, content, commit_message=commit_msg)
         
         logger.info(f"Updated theme: {theme_name}")
         return {

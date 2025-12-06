@@ -83,17 +83,11 @@ async def create_automation(automation: AutomationData):
         
         # Write back
         new_content = yaml.dump(automations, allow_unicode=True, default_flow_style=False, sort_keys=False)
-        await file_manager.write_file('automations.yaml', new_content, create_backup=True)
+        commit_msg = automation.commit_message or f"Create automation: {automation.alias}"
+        await file_manager.write_file('automations.yaml', new_content, create_backup=True, commit_message=commit_msg)
         
         # Reload automations
         await ha_client.reload_component('automations')
-        
-        # Commit
-        if git_manager.enabled:
-            await git_manager.commit_changes(
-                f"Create automation: {automation.alias}",
-                skip_if_processing=True
-            )
         
         logger.info(f"Created automation: {automation.alias}")
         
@@ -128,17 +122,11 @@ async def delete_automation(automation_id: str):
         
         # Write back
         new_content = yaml.dump(automations, allow_unicode=True, default_flow_style=False, sort_keys=False)
-        await file_manager.write_file('automations.yaml', new_content, create_backup=True)
+        commit_msg = f"Delete automation: {automation_id}"
+        await file_manager.write_file('automations.yaml', new_content, create_backup=True, commit_message=commit_msg)
         
         # Reload
         await ha_client.reload_component('automations')
-        
-        # Commit
-        if git_manager.enabled:
-            await git_manager.commit_changes(
-                f"Delete automation: {automation_id}",
-                skip_if_processing=True
-            )
         
         logger.info(f"Deleted automation: {automation_id}")
         

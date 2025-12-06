@@ -79,17 +79,14 @@ async def write_file(file_data: FileContent):
         result = await file_manager.write_file(
             file_data.path, 
             file_data.content, 
-            file_data.create_backup
+            file_data.create_backup,
+            file_data.commit_message
         )
         
-        # Auto-commit if git enabled
-        if git_manager.enabled and git_manager.auto_backup:
-            commit = await git_manager.commit_changes(
-                f"Write file: {file_data.path}",
-                skip_if_processing=True
-            )
-            if commit:
-                result['git_commit'] = commit
+        # Commit is already done in file_manager.write_file() if auto_backup is enabled
+        # Just rename the key for consistency
+        if result.get('commit'):
+            result['git_commit'] = result['commit']
         
         logger.info(f"File written: {file_data.path}. Remember to reload components if needed!")
         
@@ -114,12 +111,13 @@ async def append_to_file(file_data: FileAppend):
     ```
     """
     try:
-        result = await file_manager.append_file(file_data.path, file_data.content)
+        result = await file_manager.append_file(file_data.path, file_data.content, file_data.commit_message)
         
-        # Auto-commit
+        # Auto-commit (use custom message if provided, otherwise default)
         if git_manager.enabled and git_manager.auto_backup:
+            commit_msg = file_data.commit_message or f"Append to file: {file_data.path}"
             commit = await git_manager.commit_changes(
-                f"Append to file: {file_data.path}",
+                commit_msg,
                 skip_if_processing=True
             )
             if commit:

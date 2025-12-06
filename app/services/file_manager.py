@@ -74,17 +74,25 @@ class FileManager:
             logger.error(f"Error reading file {file_path}: {e}")
             raise
     
-    async def write_file(self, file_path: str, content: str, create_backup: bool = True) -> Dict:
-        """Write file contents"""
+    async def write_file(self, file_path: str, content: str, create_backup: bool = True, commit_message: Optional[str] = None) -> Dict:
+        """Write file contents
+        
+        Args:
+            file_path: Relative path to file
+            content: File content to write
+            create_backup: Whether to create backup before writing
+            commit_message: Optional custom commit message for Git backup
+        """
         try:
+            from app.services.git_manager import git_manager
             full_path = self._get_full_path(file_path)
             
             # Create backup if file exists (but skip if processing request - checkpoint already created)
             backup_path = None
             if create_backup and full_path.exists():
-                from app.services.git_manager import git_manager
+                backup_msg = f"Backup before writing {file_path}"
                 backup_path = await git_manager.commit_changes(
-                    f"Backup before writing {file_path}",
+                    backup_msg,
                     skip_if_processing=True
                 )
             
@@ -97,18 +105,35 @@ class FileManager:
             
             logger.info(f"Wrote file: {file_path} ({len(content)} bytes)")
             
+            # Commit changes after writing (if git enabled and auto_backup is on)
+            # Use custom commit_message if provided, otherwise default
+            commit_hash = None
+            if git_manager.enabled and git_manager.auto_backup:
+                commit_msg = commit_message or f"Write file: {file_path}"
+                commit_hash = await git_manager.commit_changes(
+                    commit_msg,
+                    skip_if_processing=True
+                )
+            
             return {
                 "success": True,
                 "path": file_path,
                 "size": len(content),
-                "backup": backup_path
+                "backup": backup_path,
+                "commit": commit_hash
             }
         except Exception as e:
             logger.error(f"Error writing file {file_path}: {e}")
             raise
     
-    async def append_file(self, file_path: str, content: str) -> Dict:
-        """Append content to file"""
+    async def append_file(self, file_path: str, content: str, commit_message: Optional[str] = None) -> Dict:
+        """Append content to file
+        
+        Args:
+            file_path: Relative path to file
+            content: Content to append
+            commit_message: Optional custom commit message for Git backup
+        """
         try:
             full_path = self._get_full_path(file_path)
             

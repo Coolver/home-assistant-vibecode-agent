@@ -239,8 +239,9 @@ async def create_helper(helper: HelperCreate):
         
         # Commit changes
         if git_manager.enabled:
+            commit_msg = helper.commit_message or f"Create helper: {full_entity_id} - {helper_name}"
             await git_manager.commit_changes(
-                f"Create helper: {full_entity_id} - {helper_name}",
+                commit_msg,
                 skip_if_processing=True
             )
         

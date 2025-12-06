@@ -90,18 +90,13 @@ async def create_script(config: dict):
         
         # Write back
         new_content = yaml.dump(scripts, allow_unicode=True, default_flow_style=False, sort_keys=False)
-        await file_manager.write_file('scripts.yaml', new_content, create_backup=True)
+        script_alias = script_data.get('alias', entity_id)
+        # Try to get commit_message from config if ScriptData model was used
+        commit_msg = config.get('commit_message') or f"Create script: {script_alias}"
+        await file_manager.write_file('scripts.yaml', new_content, create_backup=True, commit_message=commit_msg)
         
         # Reload
         await ha_client.reload_component('scripts')
-        
-        # Commit
-        if git_manager.enabled:
-            script_alias = script_data.get('alias', entity_id)
-            await git_manager.commit_changes(
-                f"Create script: {script_alias}",
-                skip_if_processing=True
-            )
         
         logger.info(f"Created script: {entity_id}")
         
@@ -123,15 +118,10 @@ async def delete_script(script_id: str):
         del scripts[script_id]
         
         new_content = yaml.dump(scripts, allow_unicode=True, default_flow_style=False, sort_keys=False)
-        await file_manager.write_file('scripts.yaml', new_content, create_backup=True)
+        commit_msg = f"Delete script: {script_id}"
+        await file_manager.write_file('scripts.yaml', new_content, create_backup=True, commit_message=commit_msg)
         
         await ha_client.reload_component('scripts')
-        
-        if git_manager.enabled:
-            await git_manager.commit_changes(
-                f"Delete script: {script_id}",
-                skip_if_processing=True
-            )
         
         logger.info(f"Deleted script: {script_id}")
         

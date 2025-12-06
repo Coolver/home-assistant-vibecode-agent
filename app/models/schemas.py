@@ -7,16 +7,19 @@ class FileContent(BaseModel):
     path: str = Field(..., description="Relative path from /config")
     content: str = Field(..., description="File content")
     create_backup: bool = Field(True, description="Create backup before writing")
+    commit_message: Optional[str] = Field(None, description="Custom commit message for Git backup (e.g., 'Fix automation: add motion sensor trigger')")
 
 class FileAppend(BaseModel):
     """File append model"""
     path: str
     content: str
+    commit_message: Optional[str] = Field(None, description="Custom commit message for Git backup (e.g., 'Add new automation to automations.yaml')")
 
 class HelperCreate(BaseModel):
     """Helper creation model"""
     type: str = Field(..., description="Helper type: input_boolean, input_text, input_number, input_datetime, input_select")
     config: Dict[str, Any] = Field(..., description="Helper configuration including 'name' and other options")
+    commit_message: Optional[str] = Field(None, description="Custom commit message for Git backup (e.g., 'Add helper: climate system enabled switch')")
 
 class AutomationData(BaseModel):
     """Automation data model"""
@@ -27,6 +30,7 @@ class AutomationData(BaseModel):
     condition: Optional[List[Dict[str, Any]]] = []
     action: List[Dict[str, Any]]
     mode: str = "single"
+    commit_message: Optional[str] = Field(None, description="Custom commit message for Git backup (e.g., 'Add automation: motion sensor light control')")
 
 class ScriptData(BaseModel):
     """Script data model"""
@@ -36,6 +40,7 @@ class ScriptData(BaseModel):
     mode: str = "single"
     icon: Optional[str] = None
     description: Optional[str] = None
+    commit_message: Optional[str] = Field(None, description="Custom commit message for Git backup (e.g., 'Add script: climate control startup')")
 
 class ServiceCall(BaseModel):
     """Service call model"""

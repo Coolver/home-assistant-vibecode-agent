@@ -162,7 +162,8 @@ async def _register_dashboard(filename: str, title: str, icon: str) -> bool:
                     return False
         
         # Write updated configuration
-        await file_manager.write_file(config_path, new_config_content)
+        commit_msg = f"Register dashboard in config: {dashboard_key}"
+        await file_manager.write_file(config_path, new_config_content, commit_message=commit_msg)
         
         logger.info(f"Dashboard '{dashboard_key}' registered in configuration.yaml")
         
@@ -188,6 +189,7 @@ class ApplyDashboardRequest(BaseModel):
     create_backup: bool = True
     filename: str = "ai-dashboard.yaml"
     register_dashboard: bool = True  # Automatically register in configuration.yaml
+    commit_message: Optional[str] = None  # Custom commit message for Git backup
 
 # ==================== Endpoints ====================
 
@@ -325,11 +327,11 @@ async def apply_dashboard(request: ApplyDashboardRequest):
         # Create backup if requested
         if request.create_backup:
             logger.info("Creating backup before applying dashboard")
-            commit_msg = await git_manager.commit_changes(
+            backup_commit = await git_manager.commit_changes(
                 "Before applying generated dashboard",
                 skip_if_processing=True
             )
-            logger.info(f"Backup created: {commit_msg}")
+            logger.info(f"Backup created: {backup_commit}")
         
         # Convert config to YAML
         dashboard_yaml = yaml.dump(
@@ -341,7 +343,8 @@ async def apply_dashboard(request: ApplyDashboardRequest):
         
         # Write dashboard file
         lovelace_path = request.filename
-        await file_manager.write_file(lovelace_path, dashboard_yaml)
+        commit_msg = request.commit_message or f"Apply dashboard: {lovelace_path}"
+        await file_manager.write_file(lovelace_path, dashboard_yaml, commit_message=commit_msg)
         
         logger.info(f"Dashboard written to {lovelace_path}")
         
@@ -359,13 +362,14 @@ async def apply_dashboard(request: ApplyDashboardRequest):
             except Exception as reg_error:
                 logger.warning(f"Failed to auto-register dashboard: {reg_error}")
         
-        # Commit changes
-        if request.create_backup:
-            commit_msg = f"Applied generated dashboard: {lovelace_path}"
+        # Commit changes (if not already committed via write_file)
+        # Note: write_file already commits if auto_backup is enabled, but we may need to commit config changes
+        if request.create_backup and git_manager.enabled and git_manager.auto_backup:
             if dashboard_registered:
-                commit_msg += " (auto-registered)"
-            await git_manager.commit_changes(
-                commit_msg,
+                # Config was changed, commit it separately
+                config_commit_msg = request.commit_message or f"Register dashboard in config: {lovelace_path}"
+                await git_manager.commit_changes(
+                    config_commit_msg,
                 skip_if_processing=True
             )
         
