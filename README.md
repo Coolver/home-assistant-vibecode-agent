@@ -60,15 +60,6 @@ https://github.com/user-attachments/assets/0df48019-06c0-48dd-82ad-c7fe0734ddb3
 
 ---
 
-### 📦 Extend with the community
-
-✅ Install and configure HACS — unlock 1000+ community integrations  
-✅ Search repositories — themes, plugins, custom components, dashboards  
-✅ Install integrations — one-command setup for new HACS components  
-✅ Keep things fresh — update all HACS repositories from a single place  
-
----
-
 ### 🔒 Safe operations
 
 ✅ Git-based versioning — every change is tracked with meaningful commit messages  
@@ -76,6 +67,15 @@ https://github.com/user-attachments/assets/0df48019-06c0-48dd-82ad-c7fe0734ddb3
 ✅ Configuration validation — test before apply to reduce breaking changes  
 ✅ One-click rollback — revert to a previous state if something goes wrong  
 ✅ Activity log — full audit trail of what the agent did and when  
+
+---
+
+### 📦 Extend with the community
+
+✅ Install and configure HACS — unlock 1000+ community integrations  
+✅ Search repositories — themes, plugins, custom components, dashboards  
+✅ Install integrations — one-command setup for new HACS components  
+✅ Keep things fresh — update all HACS repositories from a single place  
 
 ---
 
