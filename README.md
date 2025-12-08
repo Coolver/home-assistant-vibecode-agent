@@ -518,6 +518,11 @@ Common issues:
 - View logs for Git errors
 - Ensure `/config` is writable
 
+## 💬 Support
+
+- 🐛 **Issues:** [GitHub Issues](https://github.com/Coolver/home-assistant-vibecode-agent/issues)
+- 💡 **Discussions:** [GitHub Discussions](https://github.com/Coolver/home-assistant-vibecode-agent/discussions)
+
 ---
 
 ## 📜 License
