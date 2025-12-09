@@ -2,8 +2,10 @@
 from fastapi import APIRouter, HTTPException, Query, Body
 from typing import List, Optional, Dict, Any
 import logging
+import yaml
 
 from app.services.ha_websocket import get_ws_client
+from app.services.file_manager import file_manager
 from app.models.schemas import Response, EntityRemoveRequest
 
 router = APIRouter()
@@ -167,6 +169,108 @@ async def remove_entity_registry_entry(request: EntityRemoveRequest):
     except Exception as e:
         logger.error(f"Failed to remove Entity Registry entry: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to remove Entity Registry entry: {str(e)}")
+
+@router.get("/entities/dead")
+async def find_dead_entities():
+    """
+    Find "dead" entities in Entity Registry
+    
+    Compares entities in Entity Registry (automation.* and script.*) with
+    automations and scripts defined in YAML files to identify entities that
+    exist in registry but are missing from YAML configuration.
+    
+    Returns:
+    - dead_automations: List of automation entities not found in automations.yaml
+    - dead_scripts: List of script entities not found in scripts.yaml
+    - summary: Counts and totals
+    """
+    try:
+        ws_client = await get_ws_client()
+        
+        # Get all entities from registry
+        all_entities = await ws_client.get_entity_registry_list()
+        
+        # Filter automation and script entities
+        registry_automations = []
+        registry_scripts = []
+        
+        for entity in all_entities:
+            entity_id = entity.get('entity_id', '')
+            platform = entity.get('platform', '')
+            unique_id = entity.get('unique_id', '')
+            
+            if entity_id.startswith('automation.') and platform == 'automation':
+                registry_automations.append({
+                    'entity_id': entity_id,
+                    'unique_id': unique_id,
+                    'name': entity.get('name'),
+                    'disabled': entity.get('disabled', False)
+                })
+            elif entity_id.startswith('script.') and platform == 'script':
+                registry_scripts.append({
+                    'entity_id': entity_id,
+                    'unique_id': unique_id,
+                    'name': entity.get('name'),
+                    'disabled': entity.get('disabled', False)
+                })
+        
+        # Get automations from YAML
+        yaml_automation_ids = set()
+        try:
+            content = await file_manager.read_file('automations.yaml')
+            automations = yaml.safe_load(content) or []
+            if isinstance(automations, list):
+                for automation in automations:
+                    automation_id = automation.get('id')
+                    if automation_id:
+                        yaml_automation_ids.add(automation_id)
+        except FileNotFoundError:
+            logger.debug("automations.yaml not found, assuming no automations")
+        except Exception as e:
+            logger.warning(f"Failed to read automations.yaml: {e}")
+        
+        # Get scripts from YAML
+        yaml_script_ids = set()
+        try:
+            content = await file_manager.read_file('scripts.yaml')
+            scripts = yaml.safe_load(content) or {}
+            if isinstance(scripts, dict):
+                yaml_script_ids = set(scripts.keys())
+        except FileNotFoundError:
+            logger.debug("scripts.yaml not found, assuming no scripts")
+        except Exception as e:
+            logger.warning(f"Failed to read scripts.yaml: {e}")
+        
+        # Find dead entities
+        dead_automations = [
+            entity for entity in registry_automations
+            if entity['unique_id'] not in yaml_automation_ids
+        ]
+        
+        dead_scripts = [
+            entity for entity in registry_scripts
+            if entity['unique_id'] not in yaml_script_ids
+        ]
+        
+        logger.info(f"Found {len(dead_automations)} dead automations and {len(dead_scripts)} dead scripts")
+        
+        return {
+            "success": True,
+            "dead_automations": dead_automations,
+            "dead_scripts": dead_scripts,
+            "summary": {
+                "total_registry_automations": len(registry_automations),
+                "total_registry_scripts": len(registry_scripts),
+                "total_yaml_automations": len(yaml_automation_ids),
+                "total_yaml_scripts": len(yaml_script_ids),
+                "dead_automations_count": len(dead_automations),
+                "dead_scripts_count": len(dead_scripts),
+                "total_dead": len(dead_automations) + len(dead_scripts)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to find dead entities: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to find dead entities: {str(e)}")
 
 # ==================== Area Registry ====================
 
