@@ -61,6 +61,10 @@ class EntityRemoveRequest(BaseModel):
     """Entity removal request model"""
     entity_id: str = Field(..., description="Entity ID to remove from registry")
 
+class AreaRemoveRequest(BaseModel):
+    """Area removal request model"""
+    area_id: str = Field(..., description="Area ID to remove from registry")
+
 class Response(BaseModel):
     """Generic response model"""
     success: bool

@@ -6,7 +6,7 @@ import yaml
 
 from app.services.ha_websocket import get_ws_client
 from app.services.file_manager import file_manager
-from app.models.schemas import Response, EntityRemoveRequest
+from app.models.schemas import Response, EntityRemoveRequest, AreaRemoveRequest
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
@@ -391,9 +391,7 @@ async def update_area_registry_entry(
         raise HTTPException(status_code=500, detail=f"Failed to update Area Registry entry: {str(e)}")
 
 @router.post("/areas/delete")
-async def delete_area_registry_entry(
-    area_id: str = Body(..., description="Area ID to delete")
-):
+async def delete_area_registry_entry(request: AreaRemoveRequest):
     """
     Delete area from Area Registry
     
@@ -401,12 +399,12 @@ async def delete_area_registry_entry(
     """
     try:
         ws_client = await get_ws_client()
-        result = await ws_client.delete_area_registry_entry(area_id)
+        result = await ws_client.delete_area_registry_entry(request.area_id)
         
-        logger.warning(f"Deleted area from Area Registry: {area_id}")
+        logger.warning(f"Deleted area from Area Registry: {request.area_id}")
         return {
             "success": True,
-            "area_id": area_id,
+            "area_id": request.area_id,
             "result": result
         }
     except Exception as e:
