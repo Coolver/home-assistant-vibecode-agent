@@ -307,7 +307,7 @@ async def delete_helper(entity_id: str, commit_message: Optional[str] = Query(No
         try:
             # Check if helper exists as entity (means it's a config entry helper)
             try:
-                state = await ha_client.get_state(entity_id)
+                state = await ha_client.get_state(entity_id, suppress_404_logging=True)
                 if state:
                     # Helper exists - try to find and delete its config entry
                     ws_client = await get_ws_client()

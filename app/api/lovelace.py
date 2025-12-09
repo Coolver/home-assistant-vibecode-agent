@@ -264,7 +264,7 @@ async def preview_current_dashboard():
         lovelace_path = "ui-lovelace.yaml"
         
         try:
-            content = await file_manager.read_file(lovelace_path)
+            content = await file_manager.read_file(lovelace_path, suppress_not_found_logging=True)
             config = yaml.safe_load(content)
             
             return Response(
