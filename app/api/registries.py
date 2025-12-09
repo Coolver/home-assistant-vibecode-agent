@@ -68,7 +68,7 @@ async def get_entity_registry_entry(entity_id: str):
 @router.post("/entities/update")
 async def update_entity_registry(
     entity_id: str = Body(..., description="Entity ID to update"),
-    name: Optional[str] = Body(None, description="New friendly name"),
+    name: Optional[str] = Body(None, description="New friendly name. Pass empty string '' to reset to original name."),
     area_id: Optional[str] = Body(None, description="Area ID to assign entity to"),
     disabled: Optional[bool] = Body(None, description="Disable/enable entity"),
     new_entity_id: Optional[str] = Body(None, description="New entity_id (rename)"),
@@ -97,8 +97,14 @@ async def update_entity_registry(
         
         # Build update dict with only provided fields
         update_data = {}
+        # Handle name: empty string means remove custom name (reset to original)
+        # Pass None to WebSocket to reset to original_name
         if name is not None:
-            update_data['name'] = name
+            if name == "":
+                # Empty string means remove custom name - pass None to reset
+                update_data['name'] = None
+            else:
+                update_data['name'] = name
         if area_id is not None:
             update_data['area_id'] = area_id
         if disabled is not None:
