@@ -8,6 +8,7 @@ from app.models.schemas import ScriptData, Response
 from app.services.file_manager import file_manager
 from app.services.ha_client import ha_client
 from app.services.git_manager import git_manager
+from app.services.ha_websocket import get_ws_client
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
@@ -126,6 +127,17 @@ async def delete_script(script_id: str, commit_message: Optional[str] = Query(No
         await file_manager.write_file('scripts.yaml', new_content, create_backup=True, commit_message=commit_msg)
         
         await ha_client.reload_component('scripts')
+        
+        # Try to remove entity from Entity Registry (if it exists)
+        # This cleans up "orphaned" registry entries that may remain after deletion
+        entity_id = f"script.{script_id}"
+        try:
+            ws_client = await get_ws_client()
+            await ws_client.remove_entity_registry_entry(entity_id)
+            logger.info(f"Removed script entity from registry: {entity_id}")
+        except Exception as e:
+            # Entity may already be removed or not exist - this is fine
+            logger.debug(f"Could not remove entity from registry (may not exist): {entity_id}, {e}")
         
         logger.info(f"Deleted script: {script_id}")
         

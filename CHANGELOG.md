@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.5] - 2025-12-09
+
+### ✨ Registry Management & Dead Entity Detection
+
+**New Features:**
+
+- ✅ **Dead Entity Detection**: New `/api/registries/entities/dead` endpoint finds automations and scripts that exist in Entity Registry but are missing from YAML files
+  
+- ✅ **Automatic Registry Cleanup**: When deleting automations or scripts via API, corresponding Entity Registry entries are automatically removed
+
+- ✅ **Area Registry Operations**: Full support for creating, updating, and deleting areas via API
+
+- ✅ **Device Registry Operations**: Full support for removing devices from Device Registry via API
+
+**Registry API Coverage:**
+- Entity Registry: list, get, update, remove
+- Area Registry: list, get, create, update, delete
+- Device Registry: list, get, update, remove
+- Dead Entity Detection: compare registry with YAML files
+
 ## [2.10.4] - 2025-12-06
 
 ### ✨ Redesigned Git Versioning & Backup System

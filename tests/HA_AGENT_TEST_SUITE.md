@@ -1,8 +1,8 @@
 # 🧪 Home Assistant Agent - Comprehensive Test Suite
 
-**Version:** 2.7.7  
+**Version:** 2.10.5  
 **Purpose:** Complete testing of all HA Cursor Agent MCP functions  
-**Usage:** Say "запусти тест Home Assistant Agent" to run full suite
+**Usage:** Say "run Home Assistant Agent test suite" to run full suite
 
 ---
 
@@ -10,6 +10,7 @@
 
 - [Files](#1-file-operations-4-tests) (4 tests)
 - [Entities](#2-entity-operations-2-tests) (2 tests)
+- [Registries](#13-registry-operations-13-tests) (13 tests)
 - [Helpers](#3-helper-operations-2-tests) (2 tests)
 - [Automations](#4-automation-operations-2-tests) (2 tests)
 - [Scripts](#5-script-operations-2-tests) (2 tests)
@@ -21,7 +22,7 @@
 - [Repositories](#11-repository-operations-2-tests) (2 tests)
 - [Logbook](#12-logbook-operations-1-test) (1 test)
 
-**Total:** 48 tests
+**Total:** 65 tests
 
 ---
 
@@ -29,9 +30,9 @@
 
 ### How to Run
 
-1. **Full Suite:** "запусти тест Home Assistant Agent"
-2. **Category:** "запусти тесты [Files/Entities/Helpers/...]"
-3. **Single Test:** "запусти тест [test_name]"
+1. **Full Suite:** "run Home Assistant Agent test suite"
+2. **Category:** "run tests [Files/Entities/Helpers/...]"
+3. **Single Test:** "run test [test_name]"
 
 ### Success Criteria
 
@@ -107,7 +108,7 @@
 
 ---
 
-## 3. Helper Operations (2 tests)
+## 3. Helper Operations (3 tests)
 
 ### test_list_helpers
 **Function:** `ha_list_helpers`  
@@ -131,9 +132,20 @@
 **Success:** Helper appears in list, entity_id exists  
 **Cleanup:** Delete helper after test
 
+### test_delete_helper
+**Function:** `ha_delete_helper`  
+**Steps:**
+1. Create test helper: `ha_create_helper` with `{ type: "input_boolean", config: { name: "Test Helper for Deletion" } }`
+2. Verify helper exists in list
+3. Delete helper: `ha_delete_helper` with `{ entity_id: "input_boolean.test_helper_for_deletion" }`
+4. Verify helper no longer appears in list  
+**Expected:** Helper deleted successfully  
+**Success:** Helper removed from list, subsequent get returns error/not found  
+**Note:** ⚠️ DESTRUCTIVE - only test with test helpers created for this purpose
+
 ---
 
-## 4. Automation Operations (2 tests)
+## 4. Automation Operations (3 tests)
 
 ### test_list_automations
 **Function:** `ha_list_automations`  
@@ -170,9 +182,20 @@
 **Success:** Automation appears in list  
 **Cleanup:** Delete automation after
 
+### test_delete_automation
+**Function:** `ha_delete_automation`  
+**Steps:**
+1. Create test automation: `ha_create_automation` with test config (id: "test_automation_for_deletion")
+2. Verify automation exists in list
+3. Delete automation: `ha_delete_automation` with `{ automation_id: "test_automation_for_deletion" }`
+4. Verify automation no longer appears in list  
+**Expected:** Automation deleted successfully  
+**Success:** Automation removed from list, subsequent get returns error/not found  
+**Note:** ⚠️ DESTRUCTIVE - only test with test automations created for this purpose
+
 ---
 
-## 5. Script Operations (2 tests)
+## 5. Script Operations (3 tests)
 
 ### test_list_scripts
 **Function:** `ha_list_scripts`  
@@ -203,6 +226,17 @@
 **Expected:** Script created  
 **Success:** Script appears in list  
 **Cleanup:** Delete script after
+
+### test_delete_script
+**Function:** `ha_delete_script`  
+**Steps:**
+1. Create test script: `ha_create_script` with test config (id: "test_script_for_deletion")
+2. Verify script exists in list
+3. Delete script: `ha_delete_script` with `{ script_id: "test_script_for_deletion" }`
+4. Verify script no longer appears in list  
+**Expected:** Script deleted successfully  
+**Success:** Script removed from list, subsequent get returns error/not found  
+**Note:** ⚠️ DESTRUCTIVE - only test with test scripts created for this purpose
 
 ---
 
@@ -240,7 +274,7 @@
 
 ---
 
-## 7. System Operations (4 tests)
+## 7. System Operations (5 tests)
 
 ### test_check_config
 **Function:** `ha_check_config`  
@@ -253,6 +287,24 @@
 **Parameters:** `{ limit: 10 }`  
 **Expected:** Last 10 log entries  
 **Success:** Returns array of log entries
+
+### test_check_agent_logs_for_errors
+**Function:** `ha_get_logs`  
+**Parameters:** `{ limit: 100, level: "ERROR" }`  
+**Expected:** Check for errors in agent logs  
+**Success:** Returns empty array or only expected/known errors  
+**Validation:**
+- Check that no unexpected ERROR level logs exist
+- Verify fallback operations logged as INFO (not ERROR) - e.g., "falling back to list method" should be INFO
+- Ensure no WebSocket connection errors
+- Confirm no authentication failures
+- Check that registry operations (Entity/Area/Device) don't produce errors
+- Verify that fallback mechanisms work correctly (no errors, only INFO logs)
+**Note:** ⚠️ **Should be run AFTER all other tests** to catch any errors they may have caused. This is a critical validation step.
+**Expected Behavior:**
+- Registry fallback operations should log: `"WebSocket result empty for {id}, falling back to list method"` as INFO
+- No ERROR logs should appear for normal fallback operations
+- Only genuine errors (connection failures, auth issues) should appear as ERROR
 
 ### test_reload_config_core
 **Function:** `ha_reload_config`  
@@ -535,31 +587,270 @@
 
 ## 🎯 Test Execution Strategy
 
-### Phase 1: Read-Only Tests (Safe)
-- All list/get/analyze operations
-- Config checking
-- Log reading
-- Entity queries
+**⚠️ Important:** `test_check_agent_logs_for_errors` should be executed **LAST** after all other tests to validate that no errors were introduced during test execution.
 
-### Phase 2: Non-Destructive Writes (Safe)
-- Create test files
-- Git commits
-- Create helpers/automations/scripts for testing
+### Step-by-Step Testing Plan
 
-### Phase 3: Reversible Operations (Caution)
-- Install/uninstall test add-ons
-- Dashboard creation/deletion
-- Git rollback (with restore)
+To avoid context loss during large test runs, tests are broken down into small, manageable steps. Execute 3-5 steps at a time, then pause and continue.
 
-### Phase 4: System Operations (Warning)
-- Config reload
-- Add-on start/stop
-- HACS operations
+**Total Steps:** 35  
+**Read-Only Steps:** 25  
+**Write Steps:** 10
 
-### Phase 5: Destructive Operations (Skip in Production)
-- HA restart
-- HACS uninstall
-- Repository modifications
+#### Phase 1: Read-Only File Operations (4 steps)
+
+**Step 1.1:** `test_list_files_root`  
+- **MCP Tool:** `ha_list_files`  
+- **Parameters:** `{ directory: "/" }`  
+- **Expected:** List of files in root directory
+
+**Step 1.2:** `test_read_configuration_yaml`  
+- **MCP Tool:** `ha_read_file`  
+- **Parameters:** `{ path: "configuration.yaml" }`  
+- **Expected:** File content as string
+
+**Step 1.3:** `test_read_automations_yaml`  
+- **MCP Tool:** `ha_read_file`  
+- **Parameters:** `{ path: "automations.yaml" }`  
+- **Expected:** File content or "not found" error
+
+**Step 1.4:** `test_read_scripts_yaml`  
+- **MCP Tool:** `ha_read_file`  
+- **Parameters:** `{ path: "scripts.yaml" }`  
+- **Expected:** File content or "not found" error
+
+#### Phase 2: Read-Only Entity Operations (3 steps)
+
+**Step 2.1:** `test_list_all_entities`  
+- **MCP Tool:** `ha_list_entities`  
+- **Parameters:** `{}`  
+- **Expected:** Array of all entities
+
+**Step 2.2:** `test_list_climate_entities`  
+- **MCP Tool:** `ha_list_entities`  
+- **Parameters:** `{ domain: "climate" }`  
+- **Expected:** Only climate entities
+
+**Step 2.3:** `test_get_entity_state`  
+- **MCP Tool:** `ha_get_entity_state`  
+- **Parameters:** `{ entity_id: "sun.sun" }`  
+- **Expected:** Entity state object
+
+#### Phase 3: Read-Only Registry Operations (6 steps)
+
+**Step 3.1:** `test_get_entity_registry_list`  
+- **MCP Tool:** `ha_get_entity_registry`  
+- **Parameters:** `{}`  
+- **Expected:** Full Entity Registry with metadata
+
+**Step 3.2:** `test_get_entity_registry_entry`  
+- **MCP Tool:** `ha_get_entity_registry_entry`  
+- **Parameters:** `{ entity_id: "<any existing entity_id>" }`  
+- **Expected:** Single entity registry entry
+
+**Step 3.3:** `test_get_area_registry_list`  
+- **MCP Tool:** `ha_get_area_registry`  
+- **Parameters:** `{}`  
+- **Expected:** Full Area Registry
+
+**Step 3.4:** `test_get_area_registry_entry`  
+- **MCP Tool:** `ha_get_area_registry_entry`  
+- **Parameters:** `{ area_id: "<any existing area_id>" }`  
+- **Expected:** Single area registry entry
+
+**Step 3.5:** `test_get_device_registry_list`  
+- **MCP Tool:** `ha_get_device_registry`  
+- **Parameters:** `{}`  
+- **Expected:** Full Device Registry
+
+**Step 3.6:** `test_find_dead_entities`  
+- **MCP Tool:** `ha_find_dead_entities`  
+- **Parameters:** `{}`  
+- **Expected:** Object with `dead_automations`, `dead_scripts`, `summary`
+
+#### Phase 4: Read-Only Helper Operations (1 step)
+
+**Step 4.1:** `test_list_helpers`  
+- **MCP Tool:** `ha_list_helpers`  
+- **Parameters:** `{}`  
+- **Expected:** List of existing helpers
+
+#### Phase 5: Read-Only Automation Operations (1 step)
+
+**Step 5.1:** `test_list_automations`  
+- **MCP Tool:** `ha_list_automations`  
+- **Parameters:** `{}`  
+- **Expected:** List of automations
+
+#### Phase 6: Read-Only Script Operations (1 step)
+
+**Step 6.1:** `test_list_scripts`  
+- **MCP Tool:** `ha_list_scripts`  
+- **Parameters:** `{}`  
+- **Expected:** List of scripts
+
+#### Phase 7: Read-Only System Operations (2 steps)
+
+**Step 7.1:** `test_check_config`  
+- **MCP Tool:** `ha_check_config`  
+- **Parameters:** `{}`  
+- **Expected:** Configuration validation result
+
+**Step 7.2:** `test_get_logs`  
+- **MCP Tool:** `ha_get_logs`  
+- **Parameters:** `{ limit: 10 }`  
+- **Expected:** Last 10 log entries
+
+#### Phase 8: Read-Only Git Operations (2 steps)
+
+**Step 8.1:** `test_git_history`  
+- **MCP Tool:** `ha_git_history`  
+- **Parameters:** `{ limit: 5 }`  
+- **Expected:** Last 5 commits
+
+**Step 8.2:** `test_git_diff`  
+- **MCP Tool:** `ha_git_diff`  
+- **Parameters:** `{}` (or with commit hashes if needed)  
+- **Expected:** Diff between commits
+
+#### Phase 9: Read-Only HACS Operations (1 step, if installed)
+
+**Step 9.1:** `test_hacs_status`  
+- **MCP Tool:** `ha_hacs_status`  
+- **Parameters:** `{}`  
+- **Expected:** HACS installation status
+
+#### Phase 10: Read-Only Add-on Operations (3 steps)
+
+**Step 10.1:** `test_list_installed_addons`  
+- **MCP Tool:** `ha_list_installed_addons`  
+- **Parameters:** `{}`  
+- **Expected:** Currently installed add-ons
+
+**Step 10.2:** `test_list_addons`  
+- **MCP Tool:** `ha_list_addons`  
+- **Parameters:** `{}`  
+- **Expected:** Available add-ons (limited list)
+
+**Step 10.3:** `test_get_addon_info`  
+- **MCP Tool:** `ha_addon_info`  
+- **Parameters:** `{ slug: "core_mosquitto" }` (or any other installed)  
+- **Expected:** Detailed add-on information
+
+#### Phase 11: Read-Only Dashboard Operations (2 steps)
+
+**Step 11.1:** `test_analyze_entities_for_dashboard`  
+- **MCP Tool:** `ha_analyze_entities_for_dashboard`  
+- **Parameters:** `{}`  
+- **Expected:** Entity analysis for dashboard creation
+
+**Step 11.2:** `test_preview_existing_dashboard`  
+- **MCP Tool:** `ha_preview_dashboard`  
+- **Parameters:** `{}`  
+- **Expected:** Current dashboard configuration
+
+#### Phase 12: Read-Only Repository Operations (1 step)
+
+**Step 12.1:** `test_list_addon_repositories`  
+- **MCP Tool:** `ha_list_repositories`  
+- **Parameters:** `{}`  
+- **Expected:** List of add-on repositories
+
+#### Phase 13: Read-Only Logbook Operations (1 step)
+
+**Step 13.1:** `test_logbook_recent_scripts`  
+- **MCP Tool:** `ha_logbook_entries`  
+- **Parameters:** `{ domains: ["script"], lookback_minutes: 120, limit: 25 }`  
+- **Expected:** Recent logbook entries for scripts
+
+#### Phase 14: Write Operations - Helper (2 steps)
+
+**Step 14.1:** `test_create_input_boolean_helper`  
+- **MCP Tool:** `ha_create_helper`  
+- **Parameters:** `{ type: "input_boolean", config: { name: "Test Agent Helper", icon: "mdi:test-tube" } }`  
+- **Expected:** Helper created successfully  
+- **Cleanup:** Delete helper after test
+
+**Step 14.2:** `test_delete_helper`  
+- **MCP Tool:** `ha_delete_helper`  
+- **Parameters:** `{ entity_id: "input_boolean.test_agent_helper" }`  
+- **Expected:** Helper deleted successfully
+
+#### Phase 15: Write Operations - Automation (2 steps)
+
+**Step 15.1:** `test_create_test_automation`  
+- **MCP Tool:** `ha_create_automation`  
+- **Parameters:** See test definition in section 4  
+- **Expected:** Automation created  
+- **Cleanup:** Delete automation after test
+
+**Step 15.2:** `test_delete_automation`  
+- **MCP Tool:** `ha_delete_automation`  
+- **Parameters:** `{ automation_id: "test_agent_automation" }`  
+- **Expected:** Automation deleted successfully
+
+#### Phase 16: Write Operations - Script (2 steps)
+
+**Step 16.1:** `test_create_test_script`  
+- **MCP Tool:** `ha_create_script`  
+- **Parameters:** See test definition in section 5  
+- **Expected:** Script created  
+- **Cleanup:** Delete script after test
+
+**Step 16.2:** `test_delete_script`  
+- **MCP Tool:** `ha_delete_script`  
+- **Parameters:** `{ script_id: "test_agent_script" }`  
+- **Expected:** Script deleted successfully
+
+#### Phase 17: Write Operations - Registry (3 steps, with cleanup)
+
+**Step 17.1:** `test_update_entity_registry`  
+- **MCP Tool:** `ha_update_entity_registry`  
+- **Parameters:** `{ entity_id: "<existing entity_id>", name: "Test Name" }`  
+- **Expected:** Entity registry updated  
+- **Cleanup:** Restore original name after test
+
+**Step 17.2:** `test_create_area_registry`  
+- **MCP Tool:** `ha_create_area`  
+- **Parameters:** `{ name: "Test Area from Agent" }`  
+- **Expected:** New area created  
+- **Cleanup:** Delete area after test
+
+**Step 17.3:** `test_update_area_registry`  
+- **MCP Tool:** `ha_update_area`  
+- **Parameters:** `{ area_id: "<existing area_id>", name: "Updated Name" }`  
+- **Expected:** Area name updated  
+- **Cleanup:** Restore original name after test
+
+#### Phase 18: Write Operations - Git (1 step)
+
+**Step 18.1:** `test_git_commit`  
+- **MCP Tool:** `ha_git_commit`  
+- **Parameters:** `{ message: "Test commit from HA Agent" }`  
+- **Expected:** Commit created
+
+#### Phase 19: Final Validation (1 step)
+
+**Step 19.1:** `test_check_agent_logs_for_errors`  
+- **MCP Tool:** `ha_get_logs`  
+- **Parameters:** `{ limit: 100, level: "ERROR" }`  
+- **Expected:** Check for errors in agent logs  
+- **Note:** ⚠️ **Must be executed LAST** after all other tests
+
+### Execution Recommendations
+
+1. **Execute 3-5 steps at a time** - optimal size for maintaining context
+2. **Pause between phases** - can stop after each Phase
+3. **Verify results** - check that results match expectations after each step
+4. **Cleanup is important** - don't forget to remove test data after write operations
+5. **Final validation** - Step 19.1 must be last
+
+### Test Output Format
+
+After each step, record:
+- ✅ **PASS** - test passed successfully
+- ❌ **FAIL** - test failed (with error description)
+- ⚠️ **SKIP** - test skipped (with reason)
 
 ---
 
@@ -567,7 +858,7 @@
 
 Track these metrics during test execution:
 
-- **Total Tests:** 48
+- **Total Tests:** 64
 - **Passed:** Count
 - **Failed:** Count
 - **Skipped:** Count
@@ -597,6 +888,8 @@ HA_AGENT_KEY=<your-token>
 - Remove test automations
 - Remove test scripts
 - Remove test dashboards
+- Restore registry changes (entity names, area names, device names)
+- Delete test areas created during tests
 - Rollback to pre-test git commit (optional)
 
 ---
@@ -611,7 +904,7 @@ HA_AGENT_KEY=<your-token>
 **Environment:** Development/Production
 
 ## Summary
-- Total: 48
+- Total: 64
 - Passed: XX
 - Failed: XX
 - Skipped: XX
@@ -636,7 +929,144 @@ HA_AGENT_KEY=<your-token>
 
 ---
 
-**Last Updated:** 2025-11-11  
-**Test Suite Version:** 1.0.0  
-**Compatible with:** HA Cursor Agent v2.7.7+
+---
+
+## 13. Registry Operations (13 tests)
+
+### test_get_entity_registry_list
+**Function:** `ha_get_entity_registry`  
+**Parameters:** `{}`  
+**Expected:** Full Entity Registry with metadata  
+**Success:** Returns array of entities with `entity_id`, `area_id`, `device_id`, `name`, `disabled_by`, etc.  
+**Note:** This provides complete metadata, unlike `ha_list_entities` which only returns states
+
+### test_get_entity_registry_entry
+**Function:** `ha_get_entity_registry_entry`  
+**Parameters:** `{ entity_id: "climate.office_trv_thermostat" }`  
+**Expected:** Single entity registry entry with full metadata  
+**Success:** Returns entity with `area_id`, `device_id`, `name`, `disabled_by`, `capabilities`, etc.  
+**Note:** Uses WebSocket `config/entity_registry/get` (works directly)
+
+### test_update_entity_registry
+**Function:** `ha_update_entity_registry`  
+**Parameters:**
+```json
+{
+  "entity_id": "climate.office_trv_thermostat",
+  "name": "Office TRV Test Name"
+}
+```
+**Expected:** Entity registry updated  
+**Success:** Returns updated entity entry with new name  
+**Cleanup:** Restore original name after test  
+**Note:** ⚠️ MODIFIES entity registry - requires approval
+
+### test_get_area_registry_list
+**Function:** `ha_get_area_registry`  
+**Parameters:** `{}`  
+**Expected:** Full Area Registry  
+**Success:** Returns array of areas with `area_id`, `name`, `aliases`, `floor_id`, etc.
+
+### test_get_area_registry_entry
+**Function:** `ha_get_area_registry_entry`  
+**Parameters:** `{ area_id: "office" }`  
+**Expected:** Single area registry entry  
+**Success:** Returns area with `area_id`, `name`, `aliases`, `temperature_entity_id`, etc.  
+**Note:** Uses fallback mechanism (WebSocket `config/area_registry/get` returns empty, falls back to list)
+
+### test_create_area_registry
+**Function:** `ha_create_area_registry`  
+**Parameters:**
+```json
+{
+  "name": "Test Area from Agent"
+}
+```
+**Expected:** New area created  
+**Success:** Returns created area with generated `area_id`  
+**Cleanup:** Delete area after test  
+**Note:** ⚠️ MODIFIES area registry - requires approval
+
+### test_update_area_registry
+**Function:** `ha_update_area_registry`  
+**Parameters:**
+```json
+{
+  "area_id": "office",
+  "name": "Office Updated Name"
+}
+```
+**Expected:** Area name updated  
+**Success:** Returns updated area with new name  
+**Cleanup:** Restore original name after test  
+**Note:** ⚠️ MODIFIES area registry - requires approval
+
+### test_get_device_registry_list
+**Function:** `ha_get_device_registry`  
+**Parameters:** `{}`  
+**Expected:** Full Device Registry  
+**Success:** Returns array of devices with `id`, `name`, `area_id`, `manufacturer`, `model`, etc.
+
+### test_get_device_registry_entry
+**Function:** `ha_get_device_registry_entry`  
+**Parameters:** `{ device_id: "00ba72baf914c16f3a25499680c5279e" }`  
+**Expected:** Single device registry entry  
+**Success:** Returns device with `id`, `name`, `area_id`, `manufacturer`, `model`, `connections`, etc.  
+**Note:** Uses fallback mechanism (WebSocket `config/device_registry/get` returns empty, falls back to list)
+
+### test_update_device_registry
+**Function:** `ha_update_device_registry`  
+**Parameters:**
+```json
+{
+  "device_id": "00ba72baf914c16f3a25499680c5279e",
+  "name_by_user": "Office TRV Updated Name"
+}
+```
+**Expected:** Device registry updated  
+**Success:** Returns updated device entry  
+**Cleanup:** Restore original name after test  
+**Note:** ⚠️ MODIFIES device registry - requires approval
+
+### test_remove_entity_registry
+**Function:** `ha_remove_entity_registry`  
+**Parameters:** `{ entity_id: "test_entity_to_remove" }`  
+**Expected:** Entity removed from registry  
+**Success:** Entity no longer appears in registry list  
+**Note:** ⚠️ DESTRUCTIVE - only test with test entities  
+**Warning:** This permanently removes entity from registry (doesn't delete entity itself)
+
+### test_delete_area_registry
+**Function:** `ha_delete_area_registry`  
+**Steps:**
+1. Create test area: `ha_create_area_registry` with `{ name: "Test Area for Deletion" }`
+2. Verify area exists in registry
+3. Delete area: `ha_delete_area_registry` with `{ area_id: "<generated_area_id>" }`
+4. Verify area no longer appears in registry list  
+**Expected:** Area deleted successfully  
+**Success:** Area removed from registry, subsequent get returns error/not found  
+**Note:** ⚠️ DESTRUCTIVE - only test with test areas created for this purpose
+
+### test_find_dead_entities
+**Function:** `ha_find_dead_entities`  
+**Parameters:** `{}`  
+**Expected:** List of "dead" entities (automations/scripts in registry but not in YAML)  
+**Success:** Returns object with:
+- `dead_automations`: Array of automation entities not found in `automations.yaml`
+- `dead_scripts`: Array of script entities not found in `scripts.yaml`
+- `summary`: Object with counts:
+  - `total_registry_automations`: Total automations in registry
+  - `total_registry_scripts`: Total scripts in registry
+  - `total_yaml_automations`: Total automations in YAML
+  - `total_yaml_scripts`: Total scripts in YAML
+  - `dead_automations_count`: Number of dead automations
+  - `dead_scripts_count`: Number of dead scripts
+  - `total_dead`: Total dead entities
+**Note:** ⚠️ READ-ONLY - safe to run, only analyzes data
+
+---
+
+**Last Updated:** 2025-12-09  
+**Test Suite Version:** 1.1.0  
+**Compatible with:** HA Cursor Agent v2.10.5+
 

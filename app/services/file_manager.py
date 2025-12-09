@@ -57,8 +57,13 @@ class FileManager:
             logger.error(f"Error listing files: {e}")
             raise
     
-    async def read_file(self, file_path: str) -> str:
-        """Read file contents"""
+    async def read_file(self, file_path: str, suppress_not_found_logging: bool = False) -> str:
+        """Read file contents
+        
+        Args:
+            file_path: Relative path to file
+            suppress_not_found_logging: If True, FileNotFoundError will be logged as DEBUG instead of ERROR
+        """
         try:
             full_path = self._get_full_path(file_path)
             
@@ -70,6 +75,12 @@ class FileManager:
             
             logger.info(f"Read file: {file_path} ({len(content)} bytes)")
             return content
+        except FileNotFoundError as e:
+            if suppress_not_found_logging:
+                logger.debug(f"File not found (expected): {file_path}")
+            else:
+                logger.error(f"Error reading file {file_path}: {e}")
+            raise
         except Exception as e:
             logger.error(f"Error reading file {file_path}: {e}")
             raise

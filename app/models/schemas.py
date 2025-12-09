@@ -57,6 +57,18 @@ class RollbackRequest(BaseModel):
     """Rollback request model"""
     commit_hash: str
 
+class EntityRemoveRequest(BaseModel):
+    """Entity removal request model"""
+    entity_id: str = Field(..., description="Entity ID to remove from registry")
+
+class AreaRemoveRequest(BaseModel):
+    """Area removal request model"""
+    area_id: str = Field(..., description="Area ID to remove from registry")
+
+class DeviceRemoveRequest(BaseModel):
+    """Device removal request model"""
+    device_id: str = Field(..., description="Device ID to remove from registry")
+
 class Response(BaseModel):
     """Generic response model"""
     success: bool

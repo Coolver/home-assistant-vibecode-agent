@@ -349,10 +349,10 @@ class HAWebSocketClient:
     async def wait_for_connection(self, timeout: float = 30.0):
         """
         Wait until WebSocket is connected
-        
+
         Args:
             timeout: Maximum time to wait
-            
+
         Raises:
             TimeoutError: If connection not established
         """
@@ -361,6 +361,327 @@ class HAWebSocketClient:
             if (datetime.now() - start).total_seconds() > timeout:
                 raise TimeoutError("WebSocket connection timeout")
             await asyncio.sleep(0.1)
+    
+    # ==================== Entity Registry ====================
+    
+    async def get_entity_registry_list(self) -> list:
+        """
+        Get all entities from Entity Registry
+        
+        Returns:
+            List of entity registry entries with metadata (area_id, device_id, name, etc.)
+        """
+        result = await self._send_message({'type': 'config/entity_registry/list'})
+        return result or []
+    
+    async def get_entity_registry_entry(self, entity_id: str) -> dict:
+        """
+        Get single entity from Entity Registry
+        
+        Args:
+            entity_id: Entity ID to get
+            
+        Returns:
+            Entity registry entry with metadata
+        """
+        result = await self._send_message({
+            'type': 'config/entity_registry/get',
+            'entity_id': entity_id
+        })
+        # Handle wrapped response format
+        if isinstance(result, dict) and 'result' in result:
+            return result['result']
+        return result or {}
+    
+    async def update_entity_registry(self, entity_id: str, **kwargs) -> dict:
+        """
+        Update entity in Entity Registry
+        
+        Args:
+            entity_id: Entity ID to update
+            **kwargs: Fields to update (name, area_id, disabled, new_entity_id, etc.)
+            
+        Returns:
+            Update result
+        """
+        message = {
+            'type': 'config/entity_registry/update',
+            'entity_id': entity_id,
+            **kwargs
+        }
+        result = await self._send_message(message)
+        logger.info(f"Updated entity registry: {entity_id}")
+        return result
+    
+    async def remove_entity_registry_entry(self, entity_id: str) -> dict:
+        """
+        Remove entity from Entity Registry
+        
+        Args:
+            entity_id: Entity ID to remove
+            
+        Returns:
+            Removal result
+        """
+        result = await self._send_message({
+            'type': 'config/entity_registry/remove',
+            'entity_id': entity_id
+        })
+        logger.debug(f"remove_entity_registry_entry result for {entity_id}: {result}")
+        
+        # Check for error in result
+        if isinstance(result, dict) and result.get('success') is False:
+            error = result.get('error', {})
+            error_message = error.get('message', str(error)) if isinstance(error, dict) else str(error)
+            logger.warning(f"Entity removal failed: {entity_id}, error: {error_message}")
+        
+        logger.info(f"Removed entity from registry: {entity_id}")
+        return result
+    
+    # ==================== Area Registry ====================
+    
+    async def get_area_registry_list(self) -> list:
+        """
+        Get all areas from Area Registry
+        
+        Returns:
+            List of area registry entries
+        """
+        result = await self._send_message({'type': 'config/area_registry/list'})
+        return result or []
+    
+    async def get_area_registry_entry(self, area_id: str) -> dict:
+        """
+        Get single area from Area Registry
+        
+        Args:
+            area_id: Area ID to get
+            
+        Returns:
+            Area registry entry
+        """
+        try:
+            result = await self._send_message({
+                'type': 'config/area_registry/get',
+                'area_id': area_id
+            })
+            logger.debug(f"get_area_registry_entry result for {area_id}: {result}")
+            
+            # Handle wrapped response format
+            if isinstance(result, dict):
+                # Check for error in result
+                if result.get('success') is False:
+                    error = result.get('error', {})
+                    logger.warning(f"Area registry get failed: {error}")
+                    return {}
+                
+                # Handle different response formats
+                if 'result' in result:
+                    return result['result'] or {}
+                # If result is the area entry itself
+                if 'area_id' in result:
+                    return result
+                    
+            area_result = result or {}
+            
+            # If result is empty or doesn't have area_id, use fallback
+            if not area_result or not area_result.get('area_id'):
+                logger.info(f"WebSocket result empty for area {area_id}, falling back to list method")
+                areas = await self.get_area_registry_list()
+                for area in areas:
+                    if area.get('area_id') == area_id:
+                        logger.debug(f"Found area {area_id} via fallback method")
+                        return area
+                logger.warning(f"Area {area_id} not found in registry list either")
+                return {}
+            
+            return area_result
+        except Exception as e:
+            logger.error(f"Error getting area registry entry {area_id}: {e}")
+            # Fallback: get from list
+            logger.info(f"Falling back to list method for area {area_id} due to exception")
+            try:
+                areas = await self.get_area_registry_list()
+                for area in areas:
+                    if area.get('area_id') == area_id:
+                        logger.debug(f"Found area {area_id} via fallback method after exception")
+                        return area
+            except Exception as fallback_error:
+                logger.error(f"Fallback also failed: {fallback_error}")
+            return {}
+    
+    async def create_area_registry_entry(self, name: str, aliases: list = None) -> dict:
+        """
+        Create new area in Area Registry
+        
+        Args:
+            name: Area name
+            aliases: Optional list of aliases
+            
+        Returns:
+            Created area entry with area_id
+        """
+        message = {
+            'type': 'config/area_registry/create',
+            'name': name
+        }
+        if aliases:
+            message['aliases'] = aliases
+        
+        result = await self._send_message(message)
+        logger.info(f"Created area: {name}")
+        return result
+    
+    async def update_area_registry_entry(self, area_id: str, name: str = None, aliases: list = None) -> dict:
+        """
+        Update area in Area Registry
+        
+        Args:
+            area_id: Area ID to update
+            name: Optional new name
+            aliases: Optional new aliases list
+            
+        Returns:
+            Update result
+        """
+        message = {
+            'type': 'config/area_registry/update',
+            'area_id': area_id
+        }
+        if name is not None:
+            message['name'] = name
+        if aliases is not None:
+            message['aliases'] = aliases
+        
+        result = await self._send_message(message)
+        logger.info(f"Updated area registry: {area_id}")
+        return result
+    
+    async def delete_area_registry_entry(self, area_id: str) -> dict:
+        """
+        Delete area from Area Registry
+        
+        Args:
+            area_id: Area ID to delete
+            
+        Returns:
+            Deletion result
+        """
+        result = await self._send_message({
+            'type': 'config/area_registry/delete',
+            'area_id': area_id
+        })
+        logger.info(f"Deleted area from registry: {area_id}")
+        return result
+    
+    # ==================== Device Registry ====================
+    
+    async def get_device_registry_list(self) -> list:
+        """
+        Get all devices from Device Registry
+        
+        Returns:
+            List of device registry entries
+        """
+        result = await self._send_message({'type': 'config/device_registry/list'})
+        return result or []
+    
+    async def get_device_registry_entry(self, device_id: str) -> dict:
+        """
+        Get single device from Device Registry
+        
+        Args:
+            device_id: Device ID to get
+            
+        Returns:
+            Device registry entry
+        """
+        try:
+            result = await self._send_message({
+                'type': 'config/device_registry/get',
+                'device_id': device_id
+            })
+            logger.debug(f"get_device_registry_entry result for {device_id}: {result}")
+            
+            # Handle wrapped response format
+            if isinstance(result, dict):
+                # Check for error in result
+                if result.get('success') is False:
+                    error = result.get('error', {})
+                    logger.warning(f"Device registry get failed: {error}")
+                    return {}
+                
+                # Handle different response formats
+                if 'result' in result:
+                    return result['result'] or {}
+                # If result is the device entry itself
+                if 'id' in result or 'device_id' in result:
+                    return result
+                    
+            device_result = result or {}
+            
+            # If result is empty or doesn't have device id, use fallback
+            if not device_result or not (device_result.get('id') or device_result.get('device_id')):
+                logger.info(f"WebSocket result empty for device {device_id}, falling back to list method")
+                devices = await self.get_device_registry_list()
+                for device in devices:
+                    if device.get('id') == device_id:
+                        logger.debug(f"Found device {device_id} via fallback method")
+                        return device
+                logger.warning(f"Device {device_id} not found in registry list either")
+                return {}
+            
+            return device_result
+        except Exception as e:
+            logger.error(f"Error getting device registry entry {device_id}: {e}")
+            # Fallback: get from list
+            logger.info(f"Falling back to list method for device {device_id} due to exception")
+            try:
+                devices = await self.get_device_registry_list()
+                for device in devices:
+                    if device.get('id') == device_id:
+                        logger.debug(f"Found device {device_id} via fallback method after exception")
+                        return device
+            except Exception as fallback_error:
+                logger.error(f"Fallback also failed: {fallback_error}")
+            return {}
+    
+    async def update_device_registry_entry(self, device_id: str, **kwargs) -> dict:
+        """
+        Update device in Device Registry
+        
+        Args:
+            device_id: Device ID to update
+            **kwargs: Fields to update (area_id, name_by_user, etc.)
+            
+        Returns:
+            Update result
+        """
+        message = {
+            'type': 'config/device_registry/update',
+            'device_id': device_id,
+            **kwargs
+        }
+        result = await self._send_message(message)
+        logger.info(f"Updated device registry: {device_id}")
+        return result
+    
+    async def remove_device_registry_entry(self, device_id: str) -> dict:
+        """
+        Remove device from Device Registry
+        
+        Args:
+            device_id: Device ID to remove
+            
+        Returns:
+            Removal result
+        """
+        result = await self._send_message({
+            'type': 'config/device_registry/remove',
+            'device_id': device_id
+        })
+        logger.info(f"Removed device from registry: {device_id}")
+        return result
 
 
 # Global WebSocket client instance
