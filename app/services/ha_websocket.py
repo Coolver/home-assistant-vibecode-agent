@@ -427,6 +427,14 @@ class HAWebSocketClient:
             'type': 'config/entity_registry/remove',
             'entity_id': entity_id
         })
+        logger.debug(f"remove_entity_registry_entry result for {entity_id}: {result}")
+        
+        # Check for error in result
+        if isinstance(result, dict) and result.get('success') is False:
+            error = result.get('error', {})
+            error_message = error.get('message', str(error)) if isinstance(error, dict) else str(error)
+            logger.warning(f"Entity removal failed: {entity_id}, error: {error_message}")
+        
         logger.info(f"Removed entity from registry: {entity_id}")
         return result
     

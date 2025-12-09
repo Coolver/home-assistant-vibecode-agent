@@ -150,12 +150,22 @@ async def remove_entity_registry_entry(
         ws_client = await get_ws_client()
         result = await ws_client.remove_entity_registry_entry(entity_id)
         
+        # Check if result indicates an error
+        if isinstance(result, dict):
+            if result.get('success') is False:
+                error = result.get('error', {})
+                error_message = error.get('message', str(error)) if isinstance(error, dict) else str(error)
+                logger.error(f"Home Assistant rejected entity removal: {entity_id}, error: {error_message}")
+                raise HTTPException(status_code=400, detail=f"Failed to remove entity: {error_message}")
+        
         logger.warning(f"Removed entity from Entity Registry: {entity_id}")
         return {
             "success": True,
             "entity_id": entity_id,
             "result": result
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to remove Entity Registry entry: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to remove Entity Registry entry: {str(e)}")
