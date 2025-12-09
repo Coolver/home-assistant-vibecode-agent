@@ -162,6 +162,34 @@ def test_git_history():
         print(f"  - {commit.get('hash', '')[:8]}: {commit.get('message', '')}")
     return history
 
+def test_find_dead_entities():
+    """Test finding dead entities in Entity Registry"""
+    print("\n=== Testing Find Dead Entities ===")
+    response = requests.get(
+        f"{BASE_URL}/registries/entities/dead",
+        headers={"X-API-Key": API_KEY} if API_KEY else {}
+    )
+    print(f"Status: {response.status_code}")
+    result = response.json()
+    print(f"Response: {json.dumps(result, indent=2)}")
+    assert response.status_code == 200, f"Find dead entities failed: {response.text}"
+    assert result.get("success") == True, "Response should indicate success"
+    assert "dead_automations" in result, "Response should contain dead_automations"
+    assert "dead_scripts" in result, "Response should contain dead_scripts"
+    assert "summary" in result, "Response should contain summary"
+    
+    summary = result.get("summary", {})
+    print(f"\nSummary:")
+    print(f"  - Total registry automations: {summary.get('total_registry_automations', 0)}")
+    print(f"  - Total registry scripts: {summary.get('total_registry_scripts', 0)}")
+    print(f"  - Total YAML automations: {summary.get('total_yaml_automations', 0)}")
+    print(f"  - Total YAML scripts: {summary.get('total_yaml_scripts', 0)}")
+    print(f"  - Dead automations: {summary.get('dead_automations_count', 0)}")
+    print(f"  - Dead scripts: {summary.get('dead_scripts_count', 0)}")
+    print(f"  - Total dead: {summary.get('total_dead', 0)}")
+    
+    return result
+
 if __name__ == "__main__":
     print("Starting comprehensive API endpoint tests...")
     print("=" * 60)
@@ -189,6 +217,10 @@ if __name__ == "__main__":
         
         # Verify git history
         test_git_history()
+        time.sleep(1)
+        
+        # Test registry endpoints
+        test_find_dead_entities()
         
         print("\n" + "=" * 60)
         print("✅ All tests passed!")
@@ -199,5 +231,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
         exit(1)
+
+
 
 
