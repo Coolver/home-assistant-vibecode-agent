@@ -58,9 +58,9 @@ class HomeAssistantClient:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.request(
-                    method,
-                    url,
-                    headers=self.headers,
+                    method, 
+                    url, 
+                    headers=self.headers, 
                     json=data,
                     params=params,
                     timeout=aiohttp.ClientTimeout(total=timeout_seconds)

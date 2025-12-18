@@ -215,12 +215,13 @@ async def get_hacs_status():
 @router.get("/repositories", response_model=Response, dependencies=[Depends(verify_token)])
 async def list_hacs_repositories(category: Optional[str] = None):
     """
-    List HACS repositories via WebSocket
+    List HACS repositories by reading storage file
     
     **Parameters:**
     - category: Filter by category (integration, plugin, theme, appdaemon, netdaemon, python_script)
     
     **Note:** Requires HACS to be installed and configured via UI first.
+    HACS stores repository data in /config/.storage/hacs.repositories
     """
     try:
         logger.info(f"Listing HACS repositories (category: {category or 'all'})...")
@@ -233,35 +234,82 @@ async def list_hacs_repositories(category: Optional[str] = None):
                 detail="HACS is not installed. Please install HACS first using /api/hacs/install"
             )
         
-        # Get WebSocket client
-        ws_client = await get_ws_client()
-        
-        # Get all states to find HACS data
-        states = await ws_client.get_states()
-        
-        # Filter HACS sensor entities
+        # Try to read HACS storage file
+        hacs_storage_path = Path("/config/.storage/hacs.repositories")
         hacs_repos = []
-        for state in states:
-            entity_id = state.get('entity_id', '')
-            
-            # HACS creates sensors for each repository
-            if entity_id.startswith('sensor.hacs_'):
-                attributes = state.get('attributes', {})
-                repo_category = attributes.get('category', '')
-                
-                # Filter by category if specified
-                if category is None or repo_category == category:
-                    hacs_repos.append({
-                        'entity_id': entity_id,
-                        'name': attributes.get('friendly_name', ''),
-                        'category': repo_category,
-                        'installed': attributes.get('installed', False),
-                        'available_version': attributes.get('available_version'),
-                        'installed_version': attributes.get('installed_version'),
-                        'repository': attributes.get('repository', ''),
-                    })
         
-        logger.info(f"Found {len(hacs_repos)} HACS repositories")
+        if hacs_storage_path.exists():
+            try:
+                import json
+                with open(hacs_storage_path, 'r', encoding='utf-8') as f:
+                    storage_data = json.load(f)
+                
+                # Log file structure for debugging
+                logger.debug(f"HACS storage file keys: {list(storage_data.keys())}")
+                
+                # HACS stores data in 'data' object directly (not 'data' -> 'repositories')
+                # The 'data' key contains a dictionary where keys are repository IDs
+                repositories_data = storage_data.get('data', {})
+                
+                # If 'data' is empty, try alternative structures
+                if not repositories_data:
+                    # Try 'data' -> 'repositories' structure (older format)
+                    repositories_data = storage_data.get('data', {}).get('repositories', {})
+                    logger.debug(f"Trying 'data.repositories' structure, found {len(repositories_data)} entries")
+                
+                # If still empty, try direct 'repositories' key
+                if not repositories_data:
+                    repositories_data = storage_data.get('repositories', {})
+                    logger.debug(f"Trying direct 'repositories' key, found {len(repositories_data)} entries")
+                
+                logger.info(f"HACS storage file contains {len(repositories_data)} repository entries")
+                
+                for repo_id, repo_info in repositories_data.items():
+                    repo_category = repo_info.get('category', '')
+                    
+                    # Filter by category if specified
+                    if category is None or repo_category == category:
+                        # Determine if repository is installed
+                        # HACS uses 'installed' boolean and 'version_installed' (not 'installed_version')
+                        installed = repo_info.get('installed', False) or repo_info.get('version_installed') is not None
+                        
+                        # Extract name from full_name if name is not available
+                        repo_name = repo_info.get('name', '')
+                        if not repo_name:
+                            full_name = repo_info.get('full_name', '')
+                            repo_name = full_name.split('/')[-1] if '/' in full_name else full_name
+                        
+                        hacs_repos.append({
+                            'repository_id': repo_id,
+                            'full_name': repo_info.get('full_name', ''),
+                            'name': repo_name,
+                            'category': repo_category,
+                            'installed': installed,
+                            'available_version': repo_info.get('available_version') or repo_info.get('version_available'),
+                            'installed_version': repo_info.get('installed_version') or repo_info.get('version_installed'),
+                            'description': repo_info.get('description', ''),
+                            'stars': repo_info.get('stars', 0) or repo_info.get('stargazers_count', 0),
+                            'downloads': repo_info.get('downloads', 0),
+                        })
+                
+                logger.info(f"Found {len(hacs_repos)} HACS repositories from storage file")
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse HACS storage file: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to parse HACS storage file: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error reading HACS storage file: {e}")
+                raise HTTPException(status_code=500, detail=f"Error reading HACS storage file: {str(e)}")
+        else:
+            logger.warning(f"HACS storage file not found at {hacs_storage_path}")
+            # Fallback: try to get installed integrations via API
+            try:
+                ws_client = await get_ws_client()
+                # Try to get integrations list via WebSocket
+                # Note: This will only show installed integrations, not all available repositories
+                logger.info("HACS storage file not found, trying alternative method...")
+            except Exception as e:
+                logger.error(f"Failed to get HACS repositories: {e}")
         
         return Response(
             success=True,
@@ -273,6 +321,8 @@ async def list_hacs_repositories(category: Optional[str] = None):
             }
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to list HACS repositories: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -318,20 +368,61 @@ async def install_hacs_repository(repository: str, category: str = "integration"
             }
         )
         
-        logger.info(f"✅ HACS repository installed: {repository}")
+        logger.info(f"WebSocket service call result: {result}")
+        
+        # Verify installation by checking repository status
+        # Wait a moment for HACS to update its storage
+        import asyncio
+        await asyncio.sleep(1)
+        
+        # Check if repository is now installed by reading storage file
+        verification_status = None
+        hacs_storage_path = Path("/config/.storage/hacs.repositories")
+        if hacs_storage_path.exists():
+            try:
+                import json
+                with open(hacs_storage_path, 'r', encoding='utf-8') as f:
+                    storage_data = json.load(f)
+                
+                repositories_data = storage_data.get('data', {})
+                
+                # Find repository by full_name
+                logger.debug(f"Verifying installation: searching for repository '{repository}' in {len(repositories_data)} repositories")
+                for repo_id, repo_info in repositories_data.items():
+                    if repo_info.get('full_name') == repository:
+                        is_installed = repo_info.get('installed', False) or repo_info.get('version_installed') is not None
+                        verification_status = {
+                            'found': True,
+                            'installed': is_installed,
+                            'version_installed': repo_info.get('version_installed'),
+                        }
+                        logger.info(f"Verification: repository '{repository}' found, installed={is_installed}, version={repo_info.get('version_installed')}")
+                        break
+                
+                if not verification_status:
+                    logger.warning(f"Verification: repository '{repository}' not found in storage yet (may need refresh)")
+                    verification_status = {'found': False, 'note': 'Repository not found in storage yet (may need refresh)'}
+            except Exception as verify_error:
+                logger.warning(f"Could not verify installation: {verify_error}")
+                verification_status = {'error': str(verify_error)}
+        
+        logger.info(f"✅ HACS repository installation initiated: {repository}")
         
         # Determine if restart needed
         restart_needed = category in ['integration', 'python_script']
         
         return Response(
             success=True,
-            message=f"Repository installed: {repository}",
+            message=f"Repository installation initiated: {repository}",
             data={
                 'repository': repository,
                 'category': category,
-                'installed': True,
+                'websocket_result': result,
+                'verification': verification_status,
+                'installed': verification_status.get('installed', False) if verification_status else None,
                 'restart_needed': restart_needed,
                 'next_steps': [
+                    'Wait a few seconds and check repository status',
                     'Restart Home Assistant if installing integration' if restart_needed else 'Repository ready to use',
                     'Configure integration in HA UI if needed'
                 ]
@@ -446,26 +537,57 @@ async def update_all_hacs():
         # Get WebSocket client
         ws_client = await get_ws_client()
         
+        # Get list of installed repositories before update
+        installed_before = []
+        hacs_storage_path = Path("/config/.storage/hacs.repositories")
+        if hacs_storage_path.exists():
+            try:
+                import json
+                with open(hacs_storage_path, 'r', encoding='utf-8') as f:
+                    storage_data = json.load(f)
+                
+                repositories_data = storage_data.get('data', {})
+                
+                logger.info(f"Reading {len(repositories_data)} repositories to get versions before update")
+                for repo_id, repo_info in repositories_data.items():
+                    if repo_info.get('installed', False) or repo_info.get('version_installed') is not None:
+                        repo_name = repo_info.get('full_name', '')
+                        version = repo_info.get('version_installed')
+                        installed_before.append({
+                            'repository': repo_name,
+                            'version_before': version,
+                        })
+                        logger.debug(f"Repository to update: {repo_name} (current version: {version})")
+                logger.info(f"Found {len(installed_before)} installed repositories to update")
+            except Exception as e:
+                logger.warning(f"Could not read repositories before update: {e}")
+        
         # Call HACS update_all service
+        logger.info(f"Calling hacs/update_all service for {len(installed_before)} repositories...")
         result = await ws_client.call_service(
             domain='hacs',
             service='update_all',
             service_data={}
         )
         
+        logger.info(f"WebSocket service call result: {result}")
         logger.info("✅ HACS update initiated for all repositories")
         
         return Response(
             success=True,
-            message="All HACS repositories update initiated",
+            message=f"Update initiated for {len(installed_before)} installed repositories",
             data={
-                'result': result,
+                'websocket_result': result,
+                'repositories_count': len(installed_before),
+                'repositories_before': installed_before,
                 'restart_needed': True,
                 'next_steps': [
-                    'Wait for downloads to complete',
+                    'Wait for downloads to complete (check HACS UI or logs)',
+                    'Use /api/hacs/repositories to check updated versions',
                     'Restart Home Assistant to apply updates',
                     'Check logs for any errors'
-                ]
+                ],
+                'verification': 'Check repository versions after a few seconds using /api/hacs/repositories'
             }
         )
         

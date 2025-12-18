@@ -2,7 +2,7 @@
 name: HA Vibecode Agent
 version: "2.10.5"
 slug: home_assistant_cursor_agent
-description: AI Agent API for Home Assistant - enables AI assistants (Cursor AI, VS Code + Copilot) to manage HA configuration
+description: Enable Cursor, VS Code, Claude Code, or any MCP-enabled IDE to help you vibe-code and manage Home Assistant: create and debug automations, design dashboards, tweak themes, modify configs, and deploy changes using natural language
 url: https://github.com/Coolver/home-assistant-cursor-agent
 arch:
   - aarch64
