@@ -237,8 +237,8 @@ async def create_helper(helper: HelperCreate):
         
         full_entity_id = f"{helper.type}.{entity_id}"
         
-        # Commit changes
-        if git_manager.enabled:
+        # Commit changes (only if auto mode is enabled)
+        if git_manager.enabled and git_manager.git_versioning_auto:
             commit_msg = helper.commit_message or f"Create helper: {full_entity_id} - {helper_name}"
             await git_manager.commit_changes(
                 commit_msg,
@@ -517,7 +517,7 @@ async def delete_helper(entity_id: str, commit_message: Optional[str] = Query(No
                     raise HTTPException(status_code=404, detail=f"Helper {entity_id} not found in {HELPER_FILES[domain]} and does not exist as an entity")
         
         # Commit changes if YAML was modified
-        if deleted_via_yaml and git_manager.enabled:
+        if deleted_via_yaml and git_manager.enabled and git_manager.git_versioning_auto:
             commit_msg = commit_message or f"Delete helper: {entity_id}"
             await git_manager.commit_changes(
                 commit_msg,

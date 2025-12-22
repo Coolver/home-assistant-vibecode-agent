@@ -12,14 +12,22 @@ import subprocess
 logger = logging.getLogger('ha_cursor_agent')
 
 class GitManager:
-    """Manages Git versioning for config files"""
+    """Manages Git versioning for config files (using a shadow Git repo)"""
     
     def __init__(self):
+        # Root of the actual Home Assistant config
         self.config_path = Path(os.getenv('CONFIG_PATH', '/config'))
+        # Shadow repository root where the agent keeps its own Git history.
+        # IMPORTANT: We no longer use /config/.git at all to avoid interfering
+        # with the user's own Git (e.g. GitHub remote).
+        self.shadow_root = self.config_path / 'ha_vibecode_git'
+
         self.enabled = os.getenv('ENABLE_GIT', 'false').lower() == 'true'
-        self.auto_backup = os.getenv('AUTO_BACKUP', 'true').lower() == 'true'
+        # git_versioning_auto: if True, commits happen automatically after each operation
+        # if False, commits only happen when explicitly requested via /api/backup/commit
+        self.git_versioning_auto = os.getenv('GIT_VERSIONING_AUTO', 'true').lower() == 'true'
         self.max_backups = int(os.getenv('MAX_BACKUPS', '30'))
-        logger.info(f"GitManager initialized: max_backups={self.max_backups}, enabled={self.enabled}")
+        logger.info(f"GitManager initialized: max_backups={self.max_backups}, enabled={self.enabled}, auto={self.git_versioning_auto}")
         self.repo = None
         self.processing_request = False  # Flag to disable auto-commits during request processing
         
@@ -27,26 +35,37 @@ class GitManager:
             self._init_repo()
     
     def _init_repo(self):
-        """Initialize Git repository"""
+        """Initialize shadow Git repository used by the agent.
+        
+        NOTE:
+        - We intentionally do NOT touch /config/.git anymore.
+        - All Git operations happen inside /config/ha_vibecode_git.
+        """
         try:
-            if (self.config_path / '.git').exists():
-                self.repo = git.Repo(self.config_path)
-                logger.info("Git repository loaded")
-                # Ensure .gitignore exists even for existing repos
-                self._create_gitignore()
+            # Ensure shadow root exists
+            self.shadow_root.mkdir(parents=True, exist_ok=True)
+
+            if (self.shadow_root / '.git').exists():
+                # Load existing shadow repository
+                self.repo = git.Repo(self.shadow_root)
+                logger.info(f"Git shadow repository loaded from {self.shadow_root}")
             else:
-                self.repo = git.Repo.init(self.config_path)
-                self.repo.config_writer().set_value("user", "name", "HA Cursor Agent").release()
+                # Initialize new shadow repository
+                self.repo = git.Repo.init(self.shadow_root)
+                self.repo.config_writer().set_value("user", "name", "HA Vibecode Agent").release()
                 self.repo.config_writer().set_value("user", "email", "agent@homeassistant.local").release()
-                # Create .gitignore to exclude large files
-                self._create_gitignore()
-                logger.info("Git repository initialized")
+                logger.info(f"Git shadow repository initialized in {self.shadow_root}")
         except Exception as e:
             logger.error(f"Failed to initialize Git: {e}")
             self.enabled = False
     
     def _create_gitignore(self):
-        """Create .gitignore file in config directory to exclude large files"""
+        """(Legacy) Create .gitignore file in config directory to exclude large files.
+        
+        NOTE: In the new shadow-repo implementation we no longer rely on
+        .gitignore in /config and we don't touch user's .git at all. This
+        method is kept for backwards compatibility only and is not used.
+        """
         gitignore_path = self.config_path / '.gitignore'
         gitignore_content = """# Home Assistant Git Backup - Exclude Large Files
 # This file is automatically created by HA Vibecode Agent
@@ -214,9 +233,228 @@ secrets.yaml
         except Exception as e:
             logger.error(f"Failed to add config files: {e}")
             raise
+
+    def _should_include_path(self, rel_path: str, is_dir: bool) -> bool:
+        """Return True if a path (relative to /config) should be tracked in Git.
+        
+        This replaces the previous .gitignore-in-/config approach. We now
+        explicitly filter which files we copy into the shadow repository:
+        - Exclude known large / internal dirs: .storage, www, media, storage, tmp, etc.
+        - Exclude DB, log and backup files
+        - Exclude secrets and key/cert files
+        - Exclude the agent's own shadow repo and any Git metadata
+        """
+        # Normalize to forward-slash style for matching
+        rel_path = rel_path.replace(os.sep, '/')
+
+        # Skip our own shadow repository and any .git directories
+        parts = rel_path.split('/')
+        if parts[0] in ('.git', 'ha_vibecode_git'):
+            return False
+
+        # Exclude well-known heavy / internal directories at top-level
+        if is_dir:
+            if parts[0] in ('.storage', '.cloud', '.homeassistant',
+                            'www', 'media', 'storage', 'tmp',
+                            'node_modules', '__pycache__'):
+                return False
+            return True
+
+        # File-level patterns
+        import fnmatch
+        filename = parts[-1]
+
+        # Secrets / keys
+        if filename in ('secrets.yaml', '.secrets.yaml'):
+            return False
+        if fnmatch.fnmatch(filename, '*.pem') or fnmatch.fnmatch(filename, '*.key') or fnmatch.fnmatch(filename, '*.crt'):
+            return False
+
+        # DB-like files
+        db_patterns = [
+            '*.db', '*.db-shm', '*.db-wal', '*.db-journal',
+            '*.sqlite', '*.sqlite3', 'home-assistant_v2.db*',
+        ]
+        for pattern in db_patterns:
+            if fnmatch.fnmatch(filename, pattern) or fnmatch.fnmatch(rel_path, pattern):
+                return False
+
+        # Logs
+        log_patterns = ['*.log', '*.log.*', 'home-assistant.log']
+        for pattern in log_patterns:
+            if fnmatch.fnmatch(filename, pattern) or fnmatch.fnmatch(rel_path, pattern):
+                return False
+
+        # Backup-like files
+        backup_patterns = ['*.bak', '*.backup', '*.old', '*.tmp', '*.temp', '*~']
+        for pattern in backup_patterns:
+            if fnmatch.fnmatch(filename, pattern) or fnmatch.fnmatch(rel_path, pattern):
+                return False
+
+        # Exclude files inside heavy/internal dirs (in case they weren't pruned as dirs)
+        dir_prefix_patterns = [
+            '.storage/', '.cloud/', '.homeassistant/',
+            'www/', 'media/', 'storage/', 'tmp/',
+        ]
+        for prefix in dir_prefix_patterns:
+            if rel_path.startswith(prefix):
+                return False
+
+        return True
+
+    def _sync_config_to_shadow(self):
+        """Synchronize filtered files from /config into the shadow repo worktree.
+        
+        This copies only the files we want to version (respecting _should_include_path)
+        and removes files from the shadow worktree that are no longer present in /config.
+        """
+        if not self.enabled:
+            return
+
+        source_root = self.config_path
+        shadow_root = self.shadow_root
+        shadow_root.mkdir(parents=True, exist_ok=True)
+
+        included_paths = set()
+
+        # Copy files from /config → shadow_root
+        for root, dirs, files in os.walk(source_root):
+            rel_root = os.path.relpath(root, source_root)
+            if rel_root == '.':
+                rel_root = ''
+
+            # Prune directories we don't want to walk into
+            pruned_dirs = []
+            for d in list(dirs):
+                rel_dir = os.path.join(rel_root, d) if rel_root else d
+                if not self._should_include_path(rel_dir, is_dir=True):
+                    dirs.remove(d)
+                    pruned_dirs.append(d)
+            if pruned_dirs:
+                logger.debug(f"Pruned dirs from sync: {pruned_dirs}")
+
+            for filename in files:
+                rel_path = os.path.join(rel_root, filename) if rel_root else filename
+                rel_path_norm = os.path.normpath(rel_path)
+                if not self._should_include_path(rel_path_norm, is_dir=False):
+                    continue
+
+                src = source_root / rel_path_norm
+                dst = shadow_root / rel_path_norm
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    shutil.copy2(src, dst)
+                    included_paths.add(rel_path_norm.replace(os.sep, '/'))
+                except Exception as e:
+                    logger.warning(f"Failed to copy {src} to shadow repo: {e}")
+
+        # Remove files from shadow_root that are no longer present in /config
+        for root, dirs, files in os.walk(shadow_root):
+            # Never touch .git inside the shadow repo
+            if '.git' in dirs:
+                dirs.remove('.git')
+
+            rel_root = os.path.relpath(root, shadow_root)
+            if rel_root == '.':
+                rel_root = ''
+
+            for filename in files:
+                rel_path = os.path.join(rel_root, filename) if rel_root else filename
+                rel_path_norm = os.path.normpath(rel_path).replace(os.sep, '/')
+                if rel_path_norm not in included_paths:
+                    try:
+                        os.remove(os.path.join(root, filename))
+                    except Exception as e:
+                        logger.warning(f"Failed to remove obsolete file from shadow repo: {rel_path_norm}: {e}")
+
+    def _sync_shadow_to_config(self, only_paths: Optional[List[str]] = None, delete_missing: bool = False):
+        """Synchronize files from shadow repo worktree back into /config.
+        
+        - If only_paths is provided: sync only those relative paths (no deletion by default).
+        - If delete_missing is True: remove files from /config that are tracked in the
+          shadow repo but are missing in its current worktree.
+        """
+        if not self.enabled:
+            return
+
+        shadow_root = self.shadow_root
+        source_root = shadow_root
+        target_root = self.config_path
+
+        def _copy_single(rel_path: str):
+            rel_path_norm = os.path.normpath(rel_path)
+            src = source_root / rel_path_norm
+            dst = target_root / rel_path_norm
+            if not src.exists():
+                return
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copy2(src, dst)
+            except Exception as e:
+                logger.warning(f"Failed to restore {rel_path_norm} to /config: {e}")
+
+        if only_paths:
+            for p in only_paths:
+                _copy_single(p)
+        else:
+            # Copy all files from shadow_root (except .git) into /config
+            for root, dirs, files in os.walk(source_root):
+                if '.git' in dirs:
+                    dirs.remove('.git')
+                rel_root = os.path.relpath(root, source_root)
+                if rel_root == '.':
+                    rel_root = ''
+                for filename in files:
+                    rel_path = os.path.join(rel_root, filename) if rel_root else filename
+                    _copy_single(rel_path)
+
+        if delete_missing:
+            # Build sets of tracked paths in shadow and in /config (filtered)
+            shadow_paths = set()
+            for root, dirs, files in os.walk(source_root):
+                if '.git' in dirs:
+                    dirs.remove('.git')
+                rel_root = os.path.relpath(root, source_root)
+                if rel_root == '.':
+                    rel_root = ''
+                for filename in files:
+                    rel_path = os.path.join(rel_root, filename) if rel_root else filename
+                    rel_path_norm = os.path.normpath(rel_path).replace(os.sep, '/')
+                    shadow_paths.add(rel_path_norm)
+
+            config_paths = set()
+            for root, dirs, files in os.walk(target_root):
+                # Never touch .git or our own shadow dir in /config
+                for skip_dir in ('.git', 'ha_vibecode_git'):
+                    if skip_dir in dirs:
+                        dirs.remove(skip_dir)
+                rel_root = os.path.relpath(root, target_root)
+                if rel_root == '.':
+                    rel_root = ''
+                for filename in files:
+                    rel_path = os.path.join(rel_root, filename) if rel_root else filename
+                    rel_path_norm = os.path.normpath(rel_path)
+                    # Apply same include filter so we don't delete ignored/large files
+                    if not self._should_include_path(rel_path_norm, is_dir=False):
+                        continue
+                    config_paths.add(rel_path_norm.replace(os.sep, '/'))
+
+            for rel_path in config_paths:
+                if rel_path not in shadow_paths:
+                    try:
+                        os.remove(target_root / rel_path)
+                        logger.info(f"Removed file from /config during rollback: {rel_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to remove {rel_path} from /config during rollback: {e}")
     
-    async def commit_changes(self, message: str = None, skip_if_processing: bool = False) -> Optional[str]:
-        """Commit current changes"""
+    async def commit_changes(self, message: str = None, skip_if_processing: bool = False, force: bool = False) -> Optional[str]:
+        """Commit current changes
+        
+        Args:
+            message: Commit message (if None, will be auto-generated)
+            skip_if_processing: Skip if request processing in progress
+            force: Force commit even if git_versioning_auto is False (for rollback/cleanup)
+        """
         if not self.enabled or not self.repo:
             return None
         
@@ -226,9 +464,17 @@ secrets.yaml
             return None
         
         try:
+            # First, synchronize filtered files from /config into the shadow repo
+            self._sync_config_to_shadow()
+
             # Check if there are changes (only for tracked files and config files)
             if not self.repo.is_dirty(untracked_files=True):
                 logger.debug("No changes to commit")
+                return None
+            
+            # If auto-commit is disabled and this is not a forced commit, only sync but don't commit
+            if not self.git_versioning_auto and not force:
+                logger.debug("Auto-commit disabled, changes synced to shadow repo but not committed")
                 return None
             
             # Add only configuration files, not all files
@@ -309,9 +555,11 @@ secrets.yaml
         
         try:
             # Commit current state first (if there are changes)
+            # force=True to always commit before checkpoint, regardless of auto mode
             commit_hash = await self.commit_changes(
                 f"Checkpoint before: {user_request}",
-                skip_if_processing=False
+                skip_if_processing=False,
+                force=True
             )
             
             # If no changes, get current HEAD
@@ -443,8 +691,9 @@ secrets.yaml
                 logger.info("Using git filter-repo for cleanup (recommended method)")
                 try:
                     # Ensure all current changes are committed before cleanup
+                    # force=True to always commit before cleanup, regardless of auto mode
                     if self.repo.is_dirty(untracked_files=True):
-                        await self.commit_changes("Pre-cleanup commit: save current state")
+                        await self.commit_changes("Pre-cleanup commit: save current state", force=True)
                     
                     # Use git filter-repo to keep only last N commits
                     # This is the cleanest and most reliable method
@@ -509,10 +758,10 @@ secrets.yaml
         try:
             repo_path = self.repo.working_dir
             
-            # CRITICAL SAFETY CHECK: Verify repo_path matches config_path
-            # This ensures we're working on the correct directory and won't accidentally delete configs
-            if str(repo_path) != str(self.config_path):
-                raise Exception(f"SAFETY CHECK FAILED: repo_path ({repo_path}) does not match config_path ({self.config_path}). This could cause data loss!")
+            # CRITICAL SAFETY CHECK: Verify repo_path matches shadow_root
+            # This ensures we're working on the correct directory and won't accidentally touch /config directly
+            if str(repo_path) != str(self.shadow_root):
+                raise Exception(f"SAFETY CHECK FAILED: repo_path ({repo_path}) does not match shadow_root ({self.shadow_root}). This could cause data loss!")
             
             git_dir = os.path.join(repo_path, '.git')
             
@@ -708,8 +957,9 @@ secrets.yaml
             current_branch = self.repo.active_branch.name
             
             # Ensure all current changes are committed before cleanup
+            # force=True to always commit before cleanup, regardless of auto mode
             if self.repo.is_dirty(untracked_files=True):
-                await self.commit_changes("Pre-cleanup commit: save current state")
+                await self.commit_changes("Pre-cleanup commit: save current state", force=True)
             
             # Get the oldest commit we want to keep (last in list is oldest)
             oldest_keep_commit = commits_to_keep[-1]
@@ -833,17 +1083,178 @@ secrets.yaml
             logger.error(f"Failed to get history: {e}")
             return []
     
+    async def get_pending_changes(self) -> Dict:
+        """Get information about uncommitted changes in shadow repository
+        
+        Returns:
+            Dict with:
+            - has_changes: bool - whether there are uncommitted changes
+            - files_modified: List[str] - list of modified file paths
+            - files_added: List[str] - list of newly added file paths
+            - files_deleted: List[str] - list of deleted file paths
+            - summary: Dict with counts
+            - diff: str - full diff (optional, can be large)
+        """
+        if not self.enabled or not self.repo:
+            return {
+                "has_changes": False,
+                "files_modified": [],
+                "files_added": [],
+                "files_deleted": [],
+                "summary": {
+                    "modified": 0,
+                    "added": 0,
+                    "deleted": 0,
+                    "total": 0
+                }
+            }
+        
+        try:
+            # Sync current state from /config to shadow repo
+            self._sync_config_to_shadow()
+            
+            # Get status of changes
+            status_output = self.repo.git.status('--porcelain')
+            
+            files_modified = []
+            files_added = []
+            files_deleted = []
+            
+            for line in status_output.strip().split('\n'):
+                if not line.strip():
+                    continue
+                
+                # Git status format: XY filename
+                # X = status of index, Y = status of work tree
+                # M = modified, A = added, D = deleted, ?? = untracked
+                status_code = line[:2]
+                file_path = line[3:].strip()
+                
+                if status_code.startswith('??'):
+                    # Untracked file (new file)
+                    files_added.append(file_path)
+                elif 'D' in status_code:
+                    # Deleted file
+                    files_deleted.append(file_path)
+                elif 'M' in status_code or 'A' in status_code:
+                    # Modified or added
+                    if status_code[0] == 'A' or status_code[1] == 'A':
+                        files_added.append(file_path)
+                    else:
+                        files_modified.append(file_path)
+            
+            has_changes = len(files_modified) > 0 or len(files_added) > 0 or len(files_deleted) > 0
+            
+            # Get diff (can be large, so make it optional)
+            diff = ""
+            if has_changes:
+                try:
+                    diff = await self.get_diff()
+                except Exception as diff_error:
+                    logger.warning(f"Failed to get diff for pending changes: {diff_error}")
+                    diff = ""
+            
+            return {
+                "has_changes": has_changes,
+                "files_modified": files_modified,
+                "files_added": files_added,
+                "files_deleted": files_deleted,
+                "summary": {
+                    "modified": len(files_modified),
+                    "added": len(files_added),
+                    "deleted": len(files_deleted),
+                    "total": len(files_modified) + len(files_added) + len(files_deleted)
+                },
+                "diff": diff
+            }
+        except Exception as e:
+            logger.error(f"Failed to get pending changes: {e}")
+            return {
+                "has_changes": False,
+                "files_modified": [],
+                "files_added": [],
+                "files_deleted": [],
+                "summary": {
+                    "modified": 0,
+                    "added": 0,
+                    "deleted": 0,
+                    "total": 0
+                },
+                "error": str(e)
+            }
+    
+    def _generate_commit_message_from_changes(self, pending_info: Dict) -> str:
+        """Generate a suggested commit message based on pending changes
+        
+        This is a simple heuristic-based generator. AI in IDE can improve it.
+        """
+        if not pending_info.get("has_changes"):
+            return "No changes to commit"
+        
+        summary = pending_info.get("summary", {})
+        files_modified = pending_info.get("files_modified", [])
+        files_added = pending_info.get("files_added", [])
+        files_deleted = pending_info.get("files_deleted", [])
+        
+        # Analyze file types and generate description
+        actions = []
+        
+        # Check for common patterns
+        if any('automation' in f.lower() for f in files_modified + files_added):
+            actions.append("Update automations")
+        if any('script' in f.lower() for f in files_modified + files_added):
+            actions.append("Update scripts")
+        if any('dashboard' in f.lower() or 'lovelace' in f.lower() for f in files_modified + files_added):
+            actions.append("Update dashboard")
+        if any('theme' in f.lower() for f in files_modified + files_added):
+            actions.append("Update theme")
+        if any('configuration' in f.lower() or 'config' in f.lower() for f in files_modified + files_added):
+            actions.append("Update configuration")
+        
+        # If we have specific file names, use them
+        if files_added:
+            for f in files_added[:3]:  # Limit to first 3
+                if 'automation' in f.lower():
+                    actions.append(f"Add automation: {f}")
+                elif 'script' in f.lower():
+                    actions.append(f"Add script: {f}")
+                elif 'dashboard' in f.lower():
+                    actions.append(f"Add dashboard: {f}")
+        
+        if files_deleted:
+            actions.append(f"Remove {len(files_deleted)} file(s)")
+        
+        # Generate message
+        if actions:
+            # Combine actions, limit length
+            message = ", ".join(actions[:5])  # Max 5 actions
+            if len(actions) > 5:
+                message += f" and {len(actions) - 5} more"
+        else:
+            # Fallback: generic message with counts
+            total = summary.get("total", 0)
+            if total == 1:
+                message = "Update configuration"
+            else:
+                message = f"Update {total} file(s)"
+        
+        return message
+    
     async def rollback(self, commit_hash: str) -> Dict:
         """Rollback to specific commit"""
         if not self.enabled or not self.repo:
             raise Exception("Git versioning not enabled")
         
         try:
-            # Commit current state before rollback
-            await self.commit_changes(f"Before rollback to {commit_hash}")
+            # Commit current state before rollback (force=True to always commit before rollback)
+            await self.commit_changes(f"Before rollback to {commit_hash}", force=True)
             
-            # Reset to commit
+            # Reset shadow repo worktree to the specified commit
             self.repo.git.reset('--hard', commit_hash)
+            
+            # Sync full state from shadow repo back into /config, removing
+            # files that are no longer present in the selected commit.
+            self._sync_shadow_to_config(only_paths=None, delete_missing=True)
             
             logger.info(f"Rolled back to commit: {commit_hash}")
             
@@ -914,6 +1325,7 @@ secrets.yaml
         if not self.repo or not self.repo.working_dir:
             raise Exception("Git repository not available or working directory missing")
         
+        # All Git operations happen in the shadow repo
         repo_path = str(self.repo.working_dir)
         
         try:
@@ -958,7 +1370,7 @@ secrets.yaml
                             )
                             if restore_result.returncode == 0:
                                 restored_files.append(file_path)
-                                logger.info(f"Restored file: {file_path}")
+                                logger.info(f"Restored file in shadow repo: {file_path}")
                             else:
                                 logger.warning(f"Failed to restore {file_path}: {restore_result.stderr}")
             else:
@@ -991,8 +1403,14 @@ secrets.yaml
                             parts = line.strip().split()
                             if len(parts) >= 2:
                                 restored_files.append(parts[-1])
-                
-                logger.info(f"Restored {len(restored_files)} files from commit {commit_hash}")
+                    
+                logger.info(f"Restored {len(restored_files)} files in shadow repo from commit {commit_hash}")
+            
+            # Sync restored files from shadow repo back into /config
+            self._sync_shadow_to_config(
+                only_paths=restored_files if file_patterns else None,
+                delete_missing=False
+            )
             
             return {
                 "success": True,

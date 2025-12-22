@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.8] - 2025-12-18
+
+### 🔧 Git Versioning: Auto/Manual Mode & Shadow Repository
+
+**New Git Versioning Mode:**
+- ✅ **Replaced `auto_backup` with `git_versioning_auto`**: More descriptive configuration option
+- ✅ **Automatic mode (`git_versioning_auto=true`)**: Commits happen automatically after each operation (default behavior)
+- ✅ **Manual mode (`git_versioning_auto=false`)**: Changes are synced to shadow repo but not committed until user explicitly requests via `/api/backup/commit`
+
+**Enhanced Commit API:**
+- ✅ **Smart commit endpoint**: `/api/backup/commit` now supports:
+  - With `message`: Commits immediately
+  - Without `message` in manual mode: Returns suggested commit message (does not commit)
+  - AI can show suggestion to user, allow editing, then commit with final message
+- ✅ **New `/api/backup/pending` endpoint**: Get information about uncommitted changes (files modified/added/deleted, summary, diff)
+- ✅ **Commit message generation**: Automatic generation of commit messages based on file changes (automations, scripts, dashboards, themes, etc.)
+
+**Shadow Repository Architecture:**
+- ✅ **Isolated Git operations**: All Git operations now happen in `/config/ha_vibecode_git` shadow repository
+- ✅ **No interference with user's Git**: Agent never touches `/config/.git`, preserving user's GitHub remotes and history
+- ✅ **Bidirectional sync**: Changes sync from `/config` to shadow repo before commits, and from shadow repo back to `/config` during rollback/restore
+
+**Critical Operations Always Commit:**
+- ✅ **Rollback**: Always commits "Before rollback" state (force=True)
+- ✅ **Cleanup**: Always commits "Pre-cleanup" state (force=True)
+- ✅ **Checkpoint**: Always commits checkpoint state (force=True)
+
+**Updated Files:**
+- `config.yaml`: `auto_backup` → `git_versioning_auto`
+- `run.sh`: Updated environment variables
+- `GitManager`: New `git_versioning_auto` logic, `get_pending_changes()`, `_generate_commit_message_from_changes()`
+- All API endpoints: Updated to use `git_versioning_auto` instead of `auto_backup`
+
 ## [2.10.7] - 2025-12-18
 
 ### 🐛 HACS Repositories Access Fix & Improvements

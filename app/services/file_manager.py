@@ -116,10 +116,10 @@ class FileManager:
             
             logger.info(f"Wrote file: {file_path} ({len(content)} bytes)")
             
-            # Commit changes after writing (if git enabled and auto_backup is on)
+            # Commit changes after writing (if git enabled and auto mode is on)
             # Use custom commit_message if provided, otherwise default
             commit_hash = None
-            if git_manager.enabled and git_manager.auto_backup:
+            if git_manager.enabled and git_manager.git_versioning_auto:
                 commit_msg = commit_message or f"Write file: {file_path}"
                 commit_hash = await git_manager.commit_changes(
                     commit_msg,

@@ -23,7 +23,7 @@ LOG_LEVEL = os.getenv('LOG_LEVEL', 'info').upper()
 logger = setup_logger('ha_cursor_agent', LOG_LEVEL)
 
 # Agent version
-AGENT_VERSION = "2.10.7"
+AGENT_VERSION = "2.10.8"
 
 # FastAPI app
 app = FastAPI(
@@ -630,6 +630,7 @@ async def health():
         "version": AGENT_VERSION,
         "config_path": os.getenv('CONFIG_PATH', '/config'),
         "git_enabled": os.getenv('ENABLE_GIT', 'false') == 'true',
+        "git_versioning_auto": os.getenv('GIT_VERSIONING_AUTO', 'true') == 'true',
         "ai_instructions": "/api/ai/instructions"
     }
 

@@ -14,18 +14,65 @@ async def create_backup(backup: BackupRequest):
     """
     Create backup (Git commit) of current state
     
-    **Example:**
+    **Behavior:**
+    - If `message` is provided: commits immediately with that message
+    - If `message` is None and `git_versioning_auto=false`: 
+      returns suggested commit message (does not commit)
+      AI should show this to user, allow editing, then call again with message
+    - If `message` is None and `git_versioning_auto=true`: 
+      commits with auto-generated message
+    
+    **Example (with message):**
     ```json
     {
       "message": "Before installing climate control system"
     }
     ```
+    
+    **Example (without message, manual mode):**
+    ```json
+    {}
+    ```
+    Returns suggested message that user can edit and confirm.
     """
     try:
         if not git_manager.enabled:
             raise HTTPException(status_code=400, detail="Git versioning is not enabled")
         
-        commit_hash = await git_manager.commit_changes(backup.message)
+        # If no message provided and auto mode is disabled, return suggested message
+        if backup.message is None and not git_manager.git_versioning_auto:
+            # Get pending changes
+            pending_info = await git_manager.get_pending_changes()
+            
+            if not pending_info.get("has_changes"):
+                return Response(
+                    success=True,
+                    message="No changes to commit",
+                    data={"has_changes": False}
+                )
+            
+            # Generate suggested commit message
+            suggested_message = git_manager._generate_commit_message_from_changes(pending_info)
+            
+            return Response(
+                success=False,  # Not committed yet, needs confirmation
+                message="Commit message suggestion (needs user confirmation)",
+                data={
+                    "needs_confirmation": True,
+                    "suggested_message": suggested_message,
+                    "summary": pending_info.get("summary"),
+                    "files_modified": pending_info.get("files_modified", []),
+                    "files_added": pending_info.get("files_added", []),
+                    "files_deleted": pending_info.get("files_deleted", []),
+                    "diff": pending_info.get("diff", "")  # Optional, can be large
+                }
+            )
+        
+        # Commit with provided message (or auto-generated if auto mode is on)
+        commit_hash = await git_manager.commit_changes(
+            backup.message,
+            force=True  # Force commit when explicitly called via API
+        )
         
         if not commit_hash:
             return Response(
@@ -227,6 +274,38 @@ async def cleanup_commits(delete_backup_branches: bool = True):
         raise
     except Exception as e:
         logger.error(f"Failed to cleanup commits: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/pending")
+async def get_pending_changes():
+    """
+    Get information about uncommitted changes in shadow repository
+    
+    Useful when `git_versioning_auto=false` to see what changes are pending commit.
+    
+    Returns:
+    - has_changes: bool
+    - files_modified, files_added, files_deleted: lists
+    - summary: counts
+    - diff: full diff (can be large)
+    """
+    try:
+        if not git_manager.enabled:
+            raise HTTPException(status_code=400, detail="Git versioning is not enabled")
+        
+        pending_info = await git_manager.get_pending_changes()
+        
+        return {
+            "success": True,
+            "has_changes": pending_info.get("has_changes", False),
+            "files_modified": pending_info.get("files_modified", []),
+            "files_added": pending_info.get("files_added", []),
+            "files_deleted": pending_info.get("files_deleted", []),
+            "summary": pending_info.get("summary", {}),
+            "diff": pending_info.get("diff", "")
+        }
+    except Exception as e:
+        logger.error(f"Failed to get pending changes: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/restore", response_model=Response)
