@@ -6,6 +6,9 @@ import logging
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+from app.env import load_env
+load_env()
+
 logger = logging.getLogger('ha_cursor_agent')
 
 # Security
@@ -56,4 +59,5 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Security(secu
             raise HTTPException(status_code=401, detail="Invalid authentication token")
         logger.info(f"✅ Token validated in development mode")
         return token
+
 

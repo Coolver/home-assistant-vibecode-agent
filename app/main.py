@@ -16,6 +16,9 @@ from app.api import files, entities, helpers, automations, scripts, system, back
 from app.utils.logger import setup_logger
 from app.ingress_panel import generate_ingress_html
 from app.services import ha_websocket
+from app.env import load_env
+load_env()
+
 from app.auth import verify_token, set_api_key, security
 
 # Setup logging
@@ -611,3 +614,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv('PORT', 8099))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
