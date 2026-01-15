@@ -31,6 +31,43 @@ async def list_scripts():
         logger.error(f"Failed to list scripts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/get/{script_id}")
+async def get_script_config(script_id: str):
+    """
+    Get configuration for a single script
+    
+    Returns the YAML configuration for a specific script_id.
+    
+    **Example response:**
+    ```json
+    {
+      "success": true,
+      "script_id": "my_script",
+      "config": {
+        "alias": "My Script",
+        "sequence": [...]
+      }
+    }
+    ```
+    """
+    try:
+        content = await file_manager.read_file('scripts.yaml')
+        scripts = yaml.safe_load(content) or {}
+        
+        if script_id not in scripts:
+            raise HTTPException(status_code=404, detail=f"Script not found: {script_id}")
+            
+        return {
+            "success": True,
+            "script_id": script_id,
+            "config": scripts[script_id]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get script {script_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/create", response_model=Response)
 async def create_script(config: dict):
     """
