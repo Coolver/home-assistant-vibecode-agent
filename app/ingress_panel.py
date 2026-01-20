@@ -31,9 +31,27 @@ def generate_ingress_html(api_key: str, agent_version: str) -> str:
   }}
 }}'''
     
-    # VS Code + Copilot JSON config for user to copy (wrapped in servers object)
-    vscode_json_config = f'''{{
-  "servers": {{
+    # VS Code + Copilot TOML config for user to copy (based on user feedback - config.toml works better)
+    vscode_toml_config = f'''[mcp_servers.home-assistant]
+command = "npx"
+args = ["-y", "@coolver/home-assistant-mcp@latest"]
+env = {{ 
+  "HA_AGENT_URL" = "http://homeassistant.local:8099",
+  "HA_AGENT_KEY" = "{api_key}"
+}}'''
+    
+    # VS Code + Codex TOML config (uses ~/.codex/config.toml)
+    vscode_codex_toml_config = f'''[mcp_servers.home-assistant]
+command = "npx"
+args = ["-y", "@coolver/home-assistant-mcp@latest"]
+env = {{ 
+  "HA_AGENT_URL" = "http://homeassistant.local:8099",
+  "HA_AGENT_KEY" = "{api_key}"
+}}'''
+    
+    # Claude Code JSON config (same format as Cursor, but can be in ~/.claude.json or .mcp.json)
+    claude_json_config = f'''{{
+  "mcpServers": {{
     "home-assistant": {{
       "command": "npx",
       "args": ["-y", "@coolver/home-assistant-mcp@latest"],
@@ -55,7 +73,9 @@ def generate_ingress_html(api_key: str, agent_version: str) -> str:
         api_key=api_key,
         agent_version=agent_version,
         cursor_json_config=cursor_json_config,
-        vscode_json_config=vscode_json_config
+        claude_json_config=claude_json_config,
+        vscode_toml_config=vscode_toml_config,
+        vscode_codex_toml_config=vscode_codex_toml_config
     )
     
     return html

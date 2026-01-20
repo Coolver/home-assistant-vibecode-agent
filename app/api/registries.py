@@ -435,12 +435,60 @@ async def list_device_registry():
         raise HTTPException(status_code=500, detail=f"Failed to list Device Registry: {str(e)}")
 
 @router.get("/devices/{device_id}")
-async def get_device_registry_entry(device_id: str):
+async def get_device_registry_entry(
+    device_id: str,
+    include_entities: bool = Query(
+        False,
+        description="If true, also return all entities belonging to this device with their descriptions",
+    ),
+):
     """
     Get single device from Device Registry
     
+    **Parameters:**
+    - `include_entities` (optional): If `true`, returns device metadata plus all entities belonging to this device with descriptions (entity_id, friendly_name, domain, what it does).
+    
+    **Example response (include_entities=false):**
+    ```json
+    {
+      "success": true,
+      "device_id": "...",
+      "device": {
+        "name": "Aqara H2 Light Switch",
+        "manufacturer": "...",
+        "model": "..."
+      }
+    }
+    ```
+    
+    **Example response (include_entities=true):**
+    ```json
+    {
+      "success": true,
+      "device_id": "...",
+      "device": {...},
+      "entities": [
+        {
+          "entity_id": "switch.aqara_h2_switch_1",
+          "friendly_name": "Aqara H2 Switch",
+          "domain": "switch",
+          "device_class": "outlet",
+          "state": "off"
+        },
+        {
+          "entity_id": "sensor.aqara_h2_energy",
+          "friendly_name": "Aqara H2 Energy",
+          "domain": "sensor",
+          "device_class": "energy",
+          "state": "0.0"
+        }
+      ]
+    }
+    ```
+    
     Example:
     - `/api/registries/devices/device_id_123`
+    - `/api/registries/devices/device_id_123?include_entities=true`
     """
     try:
         ws_client = await get_ws_client()
@@ -452,11 +500,73 @@ async def get_device_registry_entry(device_id: str):
             logger.warning(f"Device {device_id} not found, returning 404")
             raise HTTPException(status_code=404, detail=f"Device not found in registry: {device_id}")
         
-        return {
+        response = {
             "success": True,
             "device_id": device_id,
-            "device": device
+            "device": device,
         }
+        
+        # If requested, also fetch and include all entities for this device
+        if include_entities:
+            try:
+                # Get all entities from Entity Registry
+                all_entities = await ws_client.get_entity_registry_list()
+                
+                # Filter entities that belong to this device
+                device_entities = [
+                    entity
+                    for entity in all_entities
+                    if entity.get("device_id") == device_id
+                ]
+                
+                # Enrich with current state and additional info
+                from app.services.ha_client import ha_client
+                
+                enriched_entities = []
+                for entity in device_entities:
+                    entity_id = entity.get("entity_id")
+                    if not entity_id:
+                        continue
+                    
+                    # Get current state for this entity
+                    try:
+                        state_data = await ha_client.get_state(entity_id)
+                        current_state = state_data.get("state") if state_data else None
+                        attributes = state_data.get("attributes", {}) if state_data else {}
+                    except Exception:
+                        current_state = None
+                        attributes = {}
+                    
+                    # Build enriched entity info
+                    enriched_entity = {
+                        "entity_id": entity_id,
+                        "friendly_name": entity.get("name") or attributes.get("friendly_name"),
+                        "domain": entity_id.split(".", 1)[0] if "." in entity_id else None,
+                        "device_class": attributes.get("device_class"),
+                        "unit_of_measurement": attributes.get("unit_of_measurement"),
+                        "state": current_state,
+                        "disabled": entity.get("disabled", False),
+                    }
+                    
+                    enriched_entities.append(enriched_entity)
+                
+                # Sort by domain, then by entity_id for consistent output
+                enriched_entities.sort(key=lambda x: (x.get("domain") or "", x.get("entity_id") or ""))
+                
+                response["entities"] = enriched_entities
+                response["entities_count"] = len(enriched_entities)
+                
+                logger.info(
+                    f"Device {device_id} has {len(enriched_entities)} entities (include_entities=true)"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to fetch entities for device {device_id}: {e}")
+                # Don't fail the whole request if entities fetch fails
+                response["entities"] = []
+                response["entities_count"] = 0
+                response["entities_error"] = str(e)
+        
+        return response
     except HTTPException:
         raise
     except Exception as e:

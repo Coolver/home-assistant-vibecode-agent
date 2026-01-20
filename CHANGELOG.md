@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.11] - 2026-01-20
+
+### ✨ Device entity discovery & expanded IDE support
+
+**Better device understanding and setup options for more IDEs**
+
+- ✅ **Device entity discovery**: `/api/registries/devices/{device_id}` now supports `include_entities=true` parameter to return all entities belonging to a device with their descriptions (entity_id, friendly_name, domain, device_class, current state) — perfect for understanding what sensors, switches, and other entities a physical device provides
+- ✅ **VS Code + Codex support**: Added new setup tab with TOML configuration for OpenAI Codex extension in VS Code, using `~/.codex/config.toml` format
+- ✅ **VS Code + Copilot TOML migration**: Updated VS Code + Copilot setup to use `config.toml` instead of `mcp.json` (based on user feedback) for better compatibility
+- ✅ **Claude Code integration**: Added new setup tab (2nd position) with support for both CLI command (`claude mcp add`) and manual configuration via `~/.claude.json` or `.mcp.json`
+- ✅ **Enhanced device registry responses**: When `include_entities=true`, device responses include enriched entity information sorted by domain, making it easy for AI to understand device capabilities
+
 ## [2.10.10] - 2026-01-20
 
 ### ✨ LLM-friendly entity listing & YAML safety checks
