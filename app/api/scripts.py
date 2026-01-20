@@ -14,11 +14,44 @@ router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
 
 @router.get("/list")
-async def list_scripts():
-    """List all scripts from scripts.yaml"""
+async def list_scripts(ids_only: bool = Query(False, description="If true, return only script IDs without full configurations")):
+    """
+    List all scripts from scripts.yaml
+    
+    **Parameters:**
+    - `ids_only` (optional): If `true`, returns only list of script IDs. If `false` (default), returns full script configurations.
+    
+    **Example response (ids_only=false):**
+    ```json
+    {
+      "success": true,
+      "count": 3,
+      "scripts": {
+        "my_script": {"alias": "...", "sequence": [...]},
+        "another_script": {...}
+      }
+    }
+    ```
+    
+    **Example response (ids_only=true):**
+    ```json
+    {
+      "success": true,
+      "count": 3,
+      "script_ids": ["my_script", "another_script", "third_script"]
+    }
+    ```
+    """
     try:
         content = await file_manager.read_file('scripts.yaml')
         scripts = yaml.safe_load(content) or {}
+        
+        if ids_only:
+            return {
+                "success": True,
+                "count": len(scripts),
+                "script_ids": list(scripts.keys())
+            }
         
         return {
             "success": True,
@@ -26,6 +59,8 @@ async def list_scripts():
             "scripts": scripts
         }
     except FileNotFoundError:
+        if ids_only:
+            return {"success": True, "count": 0, "script_ids": []}
         return {"success": True, "count": 0, "scripts": {}}
     except Exception as e:
         logger.error(f"Failed to list scripts: {e}")

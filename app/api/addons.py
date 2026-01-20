@@ -495,6 +495,16 @@ async def add_repository(request: RepositoryRequest):
             data={'repository_url': request.repository_url}
         )
     except Exception as e:
+        error_msg = str(e)
+        # Extract more user-friendly error message from Supervisor API response
+        if "git clone" in error_msg or "fatal:" in error_msg:
+            if "could not read Username" in error_msg or "No such device or address" in error_msg:
+                error_msg = f"Repository not found or not accessible: {request.repository_url}. Please check that the repository exists and is publicly accessible."
+            elif "repository not found" in error_msg.lower():
+                error_msg = f"Repository not found: {request.repository_url}. Please verify the repository URL is correct."
+            elif "authentication" in error_msg.lower() or "permission" in error_msg.lower():
+                error_msg = f"Authentication failed for repository: {request.repository_url}. Private repositories are not supported."
+        
         logger.error(f"Error adding repository {request.repository_url}: {e}")
-        return Response(success=False, message=f"Failed to add repository: {str(e)}")
+        return Response(success=False, message=f"Failed to add repository: {error_msg}")
 

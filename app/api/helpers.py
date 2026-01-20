@@ -15,13 +15,22 @@ logger = logging.getLogger('ha_cursor_agent')
 
 CONFIG_FILE = "/config/configuration.yaml"
 
-# Each helper type gets its own file
+# Each helper-type domain gets its own YAML file which is referenced from configuration.yaml via:
+#   <domain>: !include <file>
+# For example:
+#   group: !include groups.yaml
+#   utility_meter: !include utility_meter.yaml
 HELPER_FILES = {
     'input_boolean': '/config/input_boolean.yaml',
     'input_text': '/config/input_text.yaml',
     'input_number': '/config/input_number.yaml',
     'input_datetime': '/config/input_datetime.yaml',
-    'input_select': '/config/input_select.yaml'
+    'input_select': '/config/input_select.yaml',
+    # YAML-based helpers that behave similarly to input_* from AI perspective
+    # These are not "input helpers" in HA UI, but are commonly used as building blocks
+    # and can be safely managed via YAML with the same pattern.
+    'group': '/config/groups.yaml',
+    'utility_meter': '/config/utility_meter.yaml',
 }
 
 
@@ -97,7 +106,7 @@ async def debug_services():
         
         # Extract helper-related services
         helper_services = {}
-        for domain in ['input_boolean', 'input_text', 'input_number', 'input_datetime', 'input_select']:
+        for domain in ['input_boolean', 'input_text', 'input_number', 'input_datetime', 'input_select', 'group', 'utility_meter']:
             if domain in all_services:
                 helper_services[domain] = all_services[domain]
         
@@ -112,14 +121,16 @@ async def debug_services():
 @router.get("/list")
 async def list_helpers():
     """
-    List all input helpers
+    List all helper-like entities
     
-    Returns all entities from helper domains:
+    Returns all entities from helper-related domains:
     - input_boolean
     - input_text
     - input_number
     - input_datetime
     - input_select
+    - group
+    - utility_meter
     
     Example response:
     ```json
@@ -140,8 +151,8 @@ async def list_helpers():
         # Get all entities
         all_states = await ha_client.get_states()
         
-        # Filter helper entities
-        helper_domains = ['input_boolean', 'input_text', 'input_number', 'input_datetime', 'input_select']
+        # Filter helper-like entities
+        helper_domains = ['input_boolean', 'input_text', 'input_number', 'input_datetime', 'input_select', 'group', 'utility_meter']
         helpers = [
             entity for entity in all_states 
             if any(entity['entity_id'].startswith(f"{domain}.") for domain in helper_domains)
@@ -161,16 +172,18 @@ async def list_helpers():
 @router.post("/create", response_model=Response)
 async def create_helper(helper: HelperCreate):
     """
-    Create input helper via YAML configuration
+    Create helper via YAML configuration
     
-    **Method:** Writes to helpers.yaml and reloads the integration
+    **Method:** Writes to dedicated YAML file per domain and reloads the integration
     
-    **Helper types:**
+    **Helper types (YAML-managed):**
     - `input_boolean` - Toggle/switch
     - `input_text` - Text input
     - `input_number` - Number slider
     - `input_datetime` - Date/time picker
     - `input_select` - Dropdown selection
+    - `group` - Entity groups (living_room_lights, etc.)
+    - `utility_meter` - Utility meter tracking (daily_energy, monthly_gas, etc.)
     
     **Example request (Boolean):**
     ```json
@@ -201,11 +214,11 @@ async def create_helper(helper: HelperCreate):
     """
     try:
         # Validate helper type
-        valid_types = ['input_boolean', 'input_text', 'input_number', 'input_datetime', 'input_select']
+        valid_types = ['input_boolean', 'input_text', 'input_number', 'input_datetime', 'input_select', 'group', 'utility_meter']
         if helper.type not in valid_types:
             raise HTTPException(status_code=400, detail=f"Invalid helper type. Must be one of: {', '.join(valid_types)}")
         
-        # Extract name from config (required)
+        # Extract name from config (required for all supported helper-like types)
         if 'name' not in helper.config:
             raise HTTPException(status_code=400, detail="config must include 'name' field")
         
@@ -276,7 +289,7 @@ async def delete_helper(entity_id: str, commit_message: Optional[str] = Query(No
         domain, helper_id = entity_id.split('.', 1)
         
         # Validate domain
-        valid_types = ['input_boolean', 'input_text', 'input_number', 'input_datetime', 'input_select']
+        valid_types = ['input_boolean', 'input_text', 'input_number', 'input_datetime', 'input_select', 'group', 'utility_meter']
         if domain not in valid_types:
             raise HTTPException(status_code=400, detail=f"Invalid helper domain. Must be one of: {', '.join(valid_types)}")
         

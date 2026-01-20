@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.9] - 2026-01-20
+
+### ✨ Token‑efficient access to scripts and automations
+
+**Focused YAML access to save tokens and speed up AI workflows**
+
+- ✅ **Lightweight listing endpoints**: Added support for listing script IDs and automation IDs without returning full YAML bodies, so AI tools can cheaply discover what exists before deciding what to open
+- ✅ **Single‑entity configuration fetch**: New read‑only endpoints return configuration for a single script or automation by its ID, instead of loading entire `scripts.yaml` / `automations.yaml`
+- ✅ **Token and context savings**: Designed specifically to reduce prompt/context size and token usage when working with large YAML files, especially in conversational AI scenarios
+- ✅ **Faster request handling**: By focusing responses on the one script/automation you are currently working with, the agent can answer faster and IDEs can keep conversations narrow and relevant
+
 ## [2.10.8] - 2025-12-18
 
 ### 🔧 Git Versioning: Auto/Manual Mode & Shadow Repository

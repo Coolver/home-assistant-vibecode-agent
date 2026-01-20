@@ -14,16 +14,47 @@ router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
 
 @router.get("/list")
-async def list_automations():
+async def list_automations(ids_only: bool = Query(False, description="If true, return only automation IDs without full configurations")):
     """
-    List all automations
+    List all automations from automations.yaml
     
-    Returns automations from automations.yaml
+    **Parameters:**
+    - `ids_only` (optional): If `true`, returns only list of automation IDs. If `false` (default), returns full automation configurations.
+    
+    **Example response (ids_only=false):**
+    ```json
+    {
+      "success": true,
+      "count": 2,
+      "automations": [
+        {"id": "my_automation", "alias": "...", "trigger": [...]},
+        {"id": "another", ...}
+      ]
+    }
+    ```
+    
+    **Example response (ids_only=true):**
+    ```json
+    {
+      "success": true,
+      "count": 2,
+      "automation_ids": ["my_automation", "another"]
+    }
+    ```
     """
     try:
         # Read automations.yaml
         content = await file_manager.read_file('automations.yaml')
         automations = yaml.safe_load(content) or []
+        
+        if ids_only:
+            # Extract IDs from automations list
+            automation_ids = [a.get('id') for a in automations if a.get('id')]
+            return {
+                "success": True,
+                "count": len(automation_ids),
+                "automation_ids": automation_ids
+            }
         
         return {
             "success": True,
@@ -31,9 +62,58 @@ async def list_automations():
             "automations": automations
         }
     except FileNotFoundError:
+        if ids_only:
+            return {"success": True, "count": 0, "automation_ids": []}
         return {"success": True, "count": 0, "automations": []}
     except Exception as e:
         logger.error(f"Failed to list automations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/get/{automation_id}")
+async def get_automation_config(automation_id: str):
+    """
+    Get configuration for a single automation.
+    
+    Returns the YAML configuration object for a specific automation_id from automations.yaml.
+    
+    **Example response:**
+    ```json
+    {
+      "success": true,
+      "automation_id": "my_automation",
+      "config": {
+        "id": "my_automation",
+        "alias": "My Automation",
+        "trigger": [...],
+        "condition": [...],
+        "action": [...],
+        "mode": "single"
+      }
+    }
+    ```
+    """
+    try:
+        # Read automations.yaml
+        content = await file_manager.read_file('automations.yaml')
+        automations = yaml.safe_load(content) or []
+        
+        # Find automation by id
+        for automation in automations:
+            if automation.get('id') == automation_id:
+                return {
+                    "success": True,
+                    "automation_id": automation_id,
+                    "config": automation,
+                }
+        
+        raise HTTPException(status_code=404, detail=f"Automation not found: {automation_id}")
+    except HTTPException:
+        raise
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Automation not found: {automation_id}")
+    except Exception as e:
+        logger.error(f"Failed to get automation {automation_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/create", response_model=Response)

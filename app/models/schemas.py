@@ -17,7 +17,13 @@ class FileAppend(BaseModel):
 
 class HelperCreate(BaseModel):
     """Helper creation model"""
-    type: str = Field(..., description="Helper type: input_boolean, input_text, input_number, input_datetime, input_select")
+    type: str = Field(
+        ...,
+        description=(
+            "Helper type: input_boolean, input_text, input_number, input_datetime, "
+            "input_select, group, utility_meter"
+        ),
+    )
     config: Dict[str, Any] = Field(..., description="Helper configuration including 'name' and other options")
     commit_message: Optional[str] = Field(None, description="Custom commit message for Git backup (e.g., 'Add helper: climate system enabled switch')")
 
