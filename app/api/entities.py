@@ -2,24 +2,53 @@
 from fastapi import APIRouter, HTTPException, Query, Body
 from typing import List, Optional, Dict, Any
 import logging
+import math
 
 from app.services.ha_client import ha_client
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
 
+
 @router.get("/list")
 async def list_entities(
     domain: Optional[str] = Query(None, description="Filter by domain (e.g., 'sensor', 'climate')"),
-    search: Optional[str] = Query(None, description="Search in entity_id or friendly_name")
+    search: Optional[str] = Query(None, description="Search in entity_id or friendly_name"),
+    page: int = Query(1, ge=1, description="Page number (1-based)"),
+    page_size: int = Query(
+        250,
+        ge=1,
+        le=500,
+        description="Entities per page (default 250, max 500). Helps avoid overloading LLM context.",
+    ),
+    ids_only: bool = Query(
+        False,
+        description="If true, return only list of entity IDs without any other data. Most token-efficient option.",
+    ),
+    summary_only: bool = Query(
+        False,
+        description=(
+            "If true, return lightweight summary per entity (entity_id, state, domain, friendly_name) "
+            "instead of full Home Assistant state objects. Ignored if ids_only=true."
+        ),
+    ),
 ):
     """
-    Get all entities with their states
+    Get entities with optional filters, pagination and lightweight modes.
+
+    This endpoint is designed to be LLM-friendly for installations with many entities:
+    it supports filtering, pagination and lightweight formats to avoid overloading the model context.
     
-    Examples:
-    - `/api/entities/list` - All entities
-    - `/api/entities/list?domain=climate` - Only climate entities
-    - `/api/entities/list?search=bedroom` - Search for 'bedroom'
+    **Parameters:**
+    - `ids_only` (optional): If `true`, returns only list of entity IDs. If `false` (default), returns full or summary data.
+    - `summary_only` (optional): If `true` and `ids_only=false`, returns lightweight summary per entity. Ignored if `ids_only=true`.
+    
+    **Examples:**
+    - `/api/entities/list` - First page (up to 250 entities, full state objects)
+    - `/api/entities/list?domain=climate` - Only climate entities (paginated)
+    - `/api/entities/list?search=bedroom` - Search for 'bedroom' in id or friendly_name
+    - `/api/entities/list?ids_only=true` - Only entity IDs: `["light.kitchen", "sensor.temp", ...]`
+    - `/api/entities/list?summary_only=true&page=1&page_size=250` - Lightweight summaries for first page
     """
     try:
         states = await ha_client.get_states()
@@ -28,20 +57,110 @@ async def list_entities(
         if domain:
             states = [s for s in states if s['entity_id'].startswith(f"{domain}.")]
         
-        # Search
+        # Search by entity_id or friendly_name
         if search:
             search_lower = search.lower()
             states = [
-                s for s in states 
-                if search_lower in s['entity_id'].lower() or 
-                   search_lower in s.get('attributes', {}).get('friendly_name', '').lower()
+                s
+                for s in states
+                if search_lower in s['entity_id'].lower()
+                or search_lower in s.get('attributes', {}).get('friendly_name', '').lower()
             ]
         
-        logger.info(f"Listed {len(states)} entities")
+        total = len(states)
+        if total == 0:
+            logger.info("Listed 0 entities (no matches for filters)")
+            if ids_only:
+                return {
+                    "success": True,
+                    "total": 0,
+                    "page": page,
+                    "page_size": page_size,
+                    "total_pages": 0,
+                    "entity_ids": [],
+                }
+            return {
+                "success": True,
+                "total": 0,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": 0,
+                "entities": [],
+            }
+        
+        # Pagination
+        total_pages = max(1, math.ceil(total / page_size))
+        if page > total_pages:
+            # Out-of-range page - return empty list but keep metadata
+            logger.info(
+                f"Requested entities page {page} out of range (total_pages={total_pages}), "
+                f"returning empty result"
+            )
+            if ids_only:
+                return {
+                    "success": True,
+                    "total": total,
+                    "page": page,
+                    "page_size": page_size,
+                    "total_pages": total_pages,
+                    "entity_ids": [],
+                }
+            return {
+                "success": True,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages,
+                "entities": [],
+            }
+        
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_states = states[start:end]
+        
+        # IDs-only mode - most token-efficient, returns just list of entity_id strings
+        if ids_only:
+            entity_ids = [s.get('entity_id') for s in page_states if s.get('entity_id')]
+            logger.info(
+                f"Listed {len(entity_ids)} entity IDs (page {page}/{total_pages}, total={total})"
+            )
+            return {
+                "success": True,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages,
+                "entity_ids": entity_ids,
+            }
+        
+        # Lightweight summary mode to save tokens/context
+        if summary_only:
+            def _summary(state: Dict[str, Any]) -> Dict[str, Any]:
+                attrs = state.get('attributes', {}) or {}
+                entity_id = state.get('entity_id')
+                domain_part = entity_id.split('.', 1)[0] if entity_id and '.' in entity_id else None
+                return {
+                    "entity_id": entity_id,
+                    "state": state.get('state'),
+                    "domain": domain_part,
+                    "friendly_name": attrs.get('friendly_name'),
+                }
+            
+            entities = [_summary(s) for s in page_states]
+        else:
+            entities = page_states
+        
+        logger.info(
+            f"Listed {len(entities)} entities (page {page}/{total_pages}, "
+            f"total={total}, summary_only={summary_only})"
+        )
         return {
             "success": True,
-            "count": len(states),
-            "entities": states
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "entities": entities,
         }
     except Exception as e:
         logger.error(f"Failed to list entities: {e}")

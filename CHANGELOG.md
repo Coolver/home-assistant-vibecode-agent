@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.10] - 2026-01-20
+
+### ✨ LLM-friendly entity listing & YAML safety checks
+
+**Safer, more efficient workflows for large installations and YAML edits**
+
+- ✅ **Token-efficient entity listing**: `/api/entities/list` now supports pagination (`page`, `page_size=250`) and lightweight modes so AI tools never have to dump thousands of full entity states at once
+- ✅ **IDs-only & summary modes**: New `ids_only=true` returns just a list of `entity_id` strings, and `summary_only=true` returns compact objects (`entity_id`, `state`, `domain`, `friendly_name`) — ideal for discovering what exists without overloading model context
+- ✅ **YAML syntax validation on write/append**: All writes to `*.yaml`/`*.yml` via `/api/files/write` and `/api/files/append` are now validated with `yaml.safe_load` before saving, preventing broken YAML from ever hitting `/config`
+- ✅ **Duplicate automation ID protection**: For `automations.yaml`, the agent now detects duplicate `id` values when writing/appending and rejects the change with a clear error message, helping avoid subtle HA behaviour caused by duplicated automations
+
 ## [2.10.9] - 2026-01-20
 
 ### ✨ Token‑efficient access to scripts and automations

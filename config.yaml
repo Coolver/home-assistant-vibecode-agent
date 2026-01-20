@@ -1,6 +1,6 @@
 # Home Assistant Add-on Configuration
 name: HA Vibecode Agent
-version: "2.10.9"
+version: "2.10.10"
 slug: home_assistant_cursor_agent
 description: "Enable Cursor, VS Code, Claude Code, or any MCP-enabled IDE to help you vibe-code and manage Home Assistant: create and debug automations, design dashboards, tweak themes, modify configs, and deploy changes using natural language"
 url: https://github.com/Coolver/home-assistant-cursor-agent

@@ -1,7 +1,9 @@
 """Files API endpoints"""
 from fastapi import APIRouter, HTTPException, Query
-from typing import List
+from typing import List, Tuple
 import logging
+import os
+import yaml
 
 from app.models.schemas import FileContent, FileAppend, Response
 from app.services.file_manager import file_manager
@@ -9,6 +11,86 @@ from app.services.git_manager import git_manager
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
+
+
+def _is_yaml_path(path: str) -> bool:
+    """Return True if path looks like a YAML file."""
+    lower = path.lower()
+    return lower.endswith(".yaml") or lower.endswith(".yml")
+
+
+def _validate_yaml_syntax(path: str, content: str) -> None:
+    """
+    Basic YAML syntax validation.
+
+    Prevents writing obviously invalid YAML that would break Home Assistant.
+    """
+    if not _is_yaml_path(path):
+        return
+
+    try:
+        # We don't care about structure here, only that YAML parses
+        yaml.safe_load(content or "")  # empty file is valid YAML (None)
+    except Exception as e:  # yaml.YAMLError and others
+        logger.error(f"Invalid YAML when writing {path}: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid YAML in {path}: {e}")
+
+
+def _validate_automations_structure(path: str, content: str) -> None:
+    """
+    Optional structural validation for automations.yaml.
+
+    Current goal: detect duplicate automation ids, which can lead to
+    confusing behaviour in Home Assistant. We keep the validation minimal
+    to avoid being too opinionated about future format changes:
+
+    - Only runs for files named 'automations.yaml' (any directory).
+    - Only checks when top-level YAML is a list.
+    - Only looks at 'id' fields; if there are duplicates, we reject the write.
+    """
+    # Only apply to automations.yaml files
+    if os.path.basename(path) != "automations.yaml":
+        return
+
+    try:
+        data = yaml.safe_load(content or "")
+    except Exception as e:
+        # Syntax errors are handled separately in _validate_yaml_syntax
+        logger.debug(f"Skipping automations structure check for {path} due to YAML error: {e}")
+        return
+
+    if not isinstance(data, list):
+        # Format might change in the future; don't enforce strict structure here
+        logger.debug(
+            f"Automations file {path} is not a list at top level; "
+            f"skipping duplicate id validation to avoid being too strict."
+        )
+        return
+
+    seen_ids = set()
+    duplicate_ids = set()
+
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        automation_id = item.get("id")
+        if not automation_id:
+            continue
+        if automation_id in seen_ids:
+            duplicate_ids.add(automation_id)
+        else:
+            seen_ids.add(automation_id)
+
+    if duplicate_ids:
+        ids_str = ", ".join(sorted(str(i) for i in duplicate_ids))
+        logger.error(f"Duplicate automation ids detected in {path}: {ids_str}")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Duplicate automation id values detected in {path}: {ids_str}. "
+                "Each automation id must be unique. Please remove or merge duplicates."
+            ),
+        )
 
 @router.get("/list")
 async def list_files(
@@ -66,6 +148,11 @@ async def write_file(file_data: FileContent):
     **Automatically creates backup if file exists!**
     **Note:** Does NOT auto-reload. Use /api/system/reload after changes.
     
+    For YAML files (e.g. `automations.yaml`, `scripts.yaml`), this endpoint performs:
+    - Basic YAML syntax validation (rejects invalid YAML before writing).
+    - Additional safety checks for known files like `automations.yaml`
+      (e.g. detect duplicate automation ids).
+    
     Example request:
     ```json
     {
@@ -76,9 +163,13 @@ async def write_file(file_data: FileContent):
     ```
     """
     try:
+        # YAML safety checks (syntax + known domain-specific validations)
+        _validate_yaml_syntax(file_data.path, file_data.content)
+        _validate_automations_structure(file_data.path, file_data.content)
+
         result = await file_manager.write_file(
-            file_data.path, 
-            file_data.content, 
+            file_data.path,
+            file_data.content,
             file_data.create_backup,
             file_data.commit_message
         )
@@ -102,6 +193,10 @@ async def append_to_file(file_data: FileAppend):
     
     **Note:** Does NOT auto-reload. Use /api/system/reload after changes.
     
+    For YAML files, the agent will validate the *resulting* content after append:
+    - YAML syntax must be valid.
+    - For `automations.yaml`, duplicate `id` values are rejected.
+    
     Example:
     ```json
     {
@@ -111,6 +206,16 @@ async def append_to_file(file_data: FileAppend):
     ```
     """
     try:
+        # For YAML, validate the combined content (existing + appended) before writing
+        if _is_yaml_path(file_data.path):
+            try:
+                existing = await file_manager.read_file(file_data.path, suppress_not_found_logging=True)
+            except FileNotFoundError:
+                existing = ""
+            new_content = (existing + "\n" + file_data.content) if existing else file_data.content
+            _validate_yaml_syntax(file_data.path, new_content)
+            _validate_automations_structure(file_data.path, new_content)
+
         result = await file_manager.append_file(file_data.path, file_data.content, file_data.commit_message)
         
         # Auto-commit (use custom message if provided, otherwise default)
