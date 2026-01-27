@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.24] - 2026-01-27
+
+### 🚀 API-based automation & script management + Security fix
+
+**Breaking the file structure barrier: Now works with ALL automations and scripts, regardless of where they live**
+
+#### The Problem We Solved
+
+Previously, the agent could only see and manage automations and scripts that were stored in the traditional `automations.yaml` and `scripts.yaml` files. This created a frustrating limitation for users with mature Home Assistant setups:
+
+- **Users with packages**: If you organized your config using `packages/*.yaml` files (a common practice for larger installations), the agent couldn't see those automations/scripts
+- **UI-created automations**: Automations created through Home Assistant's web interface are stored in `.storage` and were completely invisible to the agent
+- **Mixed setups**: Many users have a mix of file-based and UI-created automations, but the agent could only work with the file-based ones
+
+**Real-world impact**: A user reported having 159 automations in their system, but the agent could only see 4 of them (the ones in `automations.yaml`). The other 155 automations were invisible and unmanageable through the agent.
+
+#### The Solution
+
+We've completely rebuilt how the agent interacts with automations and scripts. Instead of reading and writing YAML files directly, the agent now uses Home Assistant's official WebSocket API (`config/automation/list`, `config/script/list`, etc.). This means:
+
+- ✅ **See everything**: `list_automations` and `list_scripts` now return ALL automations/scripts that Home Assistant knows about, regardless of where they're stored:
+  - From `automations.yaml` / `scripts.yaml` (traditional files)
+  - From `packages/*.yaml` files (organized configs)
+  - Created via UI (stored in `.storage`)
+- ✅ **Get individual items**: You can now fetch a specific automation or script by ID using `get_automation` or `get_script`, without loading entire YAML files
+- ✅ **List IDs only**: Both endpoints support `ids_only=true` parameter to get just a list of IDs without full configurations, saving tokens and context
+- ✅ **Create/update/delete via API**: All write operations now go through Home Assistant's API, so they work regardless of your file structure
+- ✅ **Smart Git versioning**: After each operation, the agent exports the current state of all automations/scripts to Git in `export/automations/<id>.yaml` and `export/scripts/<id>.yaml` format, creating a complete history
+- ✅ **Intelligent rollback**: When rolling back to a previous Git commit, the agent detects exported automations/scripts and applies them via API, ensuring consistent restoration
+- ✅ **Backwards compatible**: Old Git commits (without the export/ structure) still work via file-based rollback, so your existing backups remain functional
+
+**Result**: That user with 159 automations? Now all 159 are visible and manageable. No more file structure limitations.
+
+#### Security Fix (from PR #22)
+
+- ✅ **Secure API key regeneration**: The `/api/regenerate-key` endpoint now requires authentication (valid API key in `Authorization: Bearer <key>` header) to prevent unauthorized key regeneration from arbitrary web pages. Previously, any website could call this endpoint and regenerate your API key without authentication, creating a critical security vulnerability. The UI still works seamlessly by passing the current key in the request header when regenerating keys.
+
 ## [2.10.23] - 2026-01-27
 
 ### 🚀 API-based automation & script management + Security fix
