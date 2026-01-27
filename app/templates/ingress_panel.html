@@ -1332,7 +1332,10 @@
             try {
                 const response = await fetch('api/regenerate-key', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${fullKey}`,
+                    },
                 });
                 
                 if (!response.ok) {
@@ -1437,7 +1440,10 @@
                 // Use relative path that works through ingress
                 const response = await fetch('api/regenerate-key', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${fullKey}`,
+                    },
                 });
                 
                 if (!response.ok) {

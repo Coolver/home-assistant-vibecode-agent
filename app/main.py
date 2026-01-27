@@ -38,6 +38,12 @@ app = FastAPI(
 )
 
 # CORS
+# Note:
+# - MCP clients (Cursor, VS Code, Codex, Claude Code, etc.) talk to the agent as
+#   regular HTTP clients and are NOT affected by CORS (CORS is a browser concern).
+# - We still keep a permissive configuration here for backwards compatibility,
+#   but the critical security issue is addressed by requiring authentication for
+#   API key regeneration (see /api/regenerate-key below).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -202,9 +208,17 @@ async def ingress_panel():
     return generate_ingress_html(API_KEY, AGENT_VERSION)
 
 
-@app.post("/api/regenerate-key")
+@app.post("/api/regenerate-key", dependencies=[Depends(verify_token)])
 async def regenerate_api_key():
-    """Regenerate API key (no auth required - accessible via ingress)"""
+    """
+    Regenerate API key.
+    
+    Security:
+    - Requires a valid API key via Authorization: Bearer <API_KEY>
+    - This prevents unauthenticated regeneration from arbitrary web pages,
+      while still allowing the Ingress UI to call this endpoint as long as
+      it passes the current key in the Authorization header.
+    """
     global API_KEY
     
     try:
