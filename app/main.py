@@ -9,7 +9,7 @@ import secrets
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Depends, Security, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.middleware.cors import CORSMiddleware
+# CORSMiddleware import removed - CORS disabled for security
 from fastapi.responses import JSONResponse, HTMLResponse
 
 from app.api import files, entities, helpers, automations, scripts, system, backup, logs, logbook, ai_instructions, hacs, addons, lovelace, themes, registries
@@ -37,14 +37,12 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS middleware removed for security
+# This application is accessed via:
+# - MCP clients (not browser-based, CORS doesn't apply)
+# - Home Assistant ingress (same-origin)
+# - Local network (same-origin or direct)
+# If CORS is needed, configure specific origins via CORS_ALLOWED_ORIGINS env var
 
 # Track MCP client versions (to avoid logging on every request)
 mcp_clients_logged = set()
@@ -77,6 +75,13 @@ API_KEY_FILE = Path('/config/.ha_cursor_agent_key')
 API_KEY = None
 
 
+def mask_api_key(key: str) -> str:
+    """Mask API key for safe logging"""
+    if len(key) > 16:
+        return f"{key[:8]}...{key[-8:]}"
+    return "***"
+
+
 def get_or_generate_api_key():
     """
     Get or generate API key.
@@ -106,18 +111,16 @@ def get_or_generate_api_key():
     except Exception as e:
         logger.warning(f"Failed to save API key to file: {e}")
     
-    # Log the key
+    # Log masked key for security
+    masked = mask_api_key(api_key)
     logger.info("=" * 70)
-    logger.info("🔑 NEW API KEY GENERATED")
+    logger.info("NEW API KEY GENERATED")
     logger.info("=" * 70)
-    logger.info(f"API Key: {api_key}")
+    logger.info(f"API Key (masked): {masked}")
     logger.info("")
-    logger.info("📋 Copy this key to ~/.cursor/mcp.json:")
-    logger.info('  "env": {')
-    logger.info(f'    "HA_AGENT_KEY": "{api_key}"')
-    logger.info('  }')
-    logger.info("")
-    logger.info("💡 You can also view it anytime in: Sidebar → API Key")
+    logger.info("To view the full API key:")
+    logger.info("  - Open the Web UI at http://<host>:8099/")
+    logger.info("  - Or read from: /config/.ha_cursor_agent_key")
     logger.info("=" * 70)
     
     return api_key
@@ -202,9 +205,9 @@ async def ingress_panel():
     return generate_ingress_html(API_KEY, AGENT_VERSION)
 
 
-@app.post("/api/regenerate-key")
+@app.post("/api/regenerate-key", dependencies=[Depends(verify_token)])
 async def regenerate_api_key():
-    """Regenerate API key (no auth required - accessible via ingress)"""
+    """Regenerate API key (requires authentication)"""
     global API_KEY
     
     try:

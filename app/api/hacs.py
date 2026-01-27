@@ -8,6 +8,20 @@ import os
 from pathlib import Path
 from typing import Optional
 
+
+def safe_extract_zip(zip_content: bytes, target_dir: str) -> None:
+    """Safely extract ZIP, preventing path traversal attacks."""
+    target_path = Path(target_dir).resolve()
+
+    with zipfile.ZipFile(io.BytesIO(zip_content)) as zip_file:
+        for member in zip_file.namelist():
+            member_path = (target_path / member).resolve()
+            # Verify path stays within target directory
+            if not str(member_path).startswith(str(target_path)):
+                raise ValueError(f"Path traversal detected in ZIP: {member}")
+        # All paths validated, safe to extract
+        zip_file.extractall(target_dir)
+
 from app.models.schemas import Response
 from app.services.ha_client import ha_client
 from app.services.ha_websocket import get_ws_client
@@ -80,8 +94,7 @@ async def install_hacs():
         logger.info(f"Extracting HACS to {HACS_INSTALL_PATH}")
         os.makedirs(HACS_INSTALL_PATH, exist_ok=True)
         
-        with zipfile.ZipFile(io.BytesIO(zip_content)) as zip_file:
-            zip_file.extractall(HACS_INSTALL_PATH)
+        safe_extract_zip(zip_content, HACS_INSTALL_PATH)
         
         logger.info("HACS extracted successfully")
         
