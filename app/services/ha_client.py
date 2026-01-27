@@ -292,13 +292,22 @@ class HomeAssistantClient:
                                 automation_cache[auto_id] = auto
                             
                             # Also index by entity_id if different from id
+                            # This handles cases where Entity Registry uses entity_id that differs from automation id
                             entity_id = auto.get('entity_id', '')
-                            if entity_id.startswith('automation.'):
-                                entity_id_clean = entity_id.replace('automation.', '', 1)
+                            if entity_id:
+                                if entity_id.startswith('automation.'):
+                                    entity_id_clean = entity_id.replace('automation.', '', 1)
+                                else:
+                                    entity_id_clean = entity_id
+                                
+                                # Store under entity_id for lookup if different from id
                                 if entity_id_clean and entity_id_clean != auto_id:
-                                    # Store under both IDs for lookup
                                     if entity_id_clean not in automation_cache:
                                         automation_cache[entity_id_clean] = auto
+                                
+                                # Also store under full entity_id format
+                                if entity_id not in automation_cache and entity_id != auto_id:
+                                    automation_cache[entity_id] = auto
             except Exception:
                 pass
             
@@ -333,8 +342,30 @@ class HomeAssistantClient:
                         full_config = await self.get_automation(automation_id)
                         automations.append(full_config)
                     except Exception:
-                        # If we still can't get it, at least add the ID
-                        automations.append({'id': automation_id})
+                        # Last resort: search in .storage by entity_id if automation_id didn't work
+                        # Some UI-created automations have different id vs entity_id
+                        try:
+                            storage_file = file_manager.config_path / '.storage' / 'automation.storage'
+                            if storage_file.exists():
+                                content = storage_file.read_text(encoding='utf-8')
+                                storage_data = json.loads(content)
+                                if 'data' in storage_data and 'automations' in storage_data['data']:
+                                    for auto in storage_data['data']['automations']:
+                                        # Check if entity_id matches
+                                        auto_entity_id = auto.get('entity_id', '')
+                                        if auto_entity_id == entity_id or auto_entity_id == f"automation.{automation_id}":
+                                            automations.append(auto)
+                                            break
+                                    else:
+                                        # If still not found, at least add the ID
+                                        automations.append({'id': automation_id})
+                                else:
+                                    automations.append({'id': automation_id})
+                            else:
+                                automations.append({'id': automation_id})
+                        except Exception:
+                            # If we still can't get it, at least add the ID
+                            automations.append({'id': automation_id})
             
             # Add file-based automations not in Entity Registry
             for auto_id, auto_config in automation_cache.items():
