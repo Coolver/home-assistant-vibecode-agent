@@ -306,8 +306,64 @@ async def _export_automations_to_git(commit_message: str):
         export_dir = shadow_root / 'export' / 'automations'
         export_dir.mkdir(parents=True, exist_ok=True)
         
-        # Export each automation to its own file
-        # Also try to determine original location for better rollback support
+        # Cache packages and storage data ONCE to avoid reading files multiple times
+        from app.services.file_manager import file_manager
+        import json
+        from pathlib import Path
+        
+        # Build cache: automation_id -> location info
+        location_cache = {}
+        
+        try:
+            # Read all packages files ONCE
+            packages_dir = file_manager.config_path / 'packages'
+            if packages_dir.exists():
+                for yaml_file in packages_dir.rglob('*.yaml'):
+                    try:
+                        content = yaml_file.read_text(encoding='utf-8')
+                        data = yaml.safe_load(content)
+                        if isinstance(data, dict) and 'automation' in data:
+                            pkg_automations = data['automation']
+                            rel_path = yaml_file.relative_to(file_manager.config_path)
+                            
+                            if isinstance(pkg_automations, list):
+                                for auto in pkg_automations:
+                                    auto_id = auto.get('id')
+                                    if auto_id:
+                                        location_cache[auto_id] = {
+                                            'original_location': 'packages',
+                                            'original_file': str(rel_path)
+                                        }
+                            elif isinstance(pkg_automations, dict):
+                                for auto_id in pkg_automations.keys():
+                                    location_cache[auto_id] = {
+                                        'original_location': 'packages',
+                                        'original_file': str(rel_path)
+                                    }
+                    except Exception:
+                        continue
+            
+            # Read storage file ONCE
+            storage_file = file_manager.config_path / '.storage' / 'automation.storage'
+            if storage_file.exists():
+                try:
+                    content = storage_file.read_text(encoding='utf-8')
+                    storage_data = json.loads(content)
+                    if 'data' in storage_data and 'automations' in storage_data['data']:
+                        for auto in storage_data['data']['automations']:
+                            auto_id = auto.get('id')
+                            if auto_id and auto_id not in location_cache:
+                                location_cache[auto_id] = {
+                                    'original_location': 'storage',
+                                    'original_file': '.storage/automation.storage'
+                                }
+                except Exception:
+                    pass
+        except Exception:
+            # If we can't build cache, that's fine - we'll just skip metadata
+            pass
+        
+        # Export each automation to its own file (using cached location data)
         exported_count = 0
         for automation in automations:
             automation_id = automation.get('id')
@@ -315,55 +371,10 @@ async def _export_automations_to_git(commit_message: str):
                 logger.warning(f"Skipping automation without ID: {automation}")
                 continue
             
-            # Try to find original location (for rollback context)
-            # Note: This is informational only - REST API will handle actual storage location
+            # Add location metadata from cache if available
             automation_with_meta = dict(automation)
-            try:
-                # Try to determine if automation is in packages or storage
-                from app.services.file_manager import file_manager
-                import json
-                from pathlib import Path
-                
-                # Check packages
-                packages_dir = file_manager.config_path / 'packages'
-                if packages_dir.exists():
-                    for yaml_file in packages_dir.rglob('*.yaml'):
-                        try:
-                            content = yaml_file.read_text(encoding='utf-8')
-                            data = yaml.safe_load(content)
-                            if isinstance(data, dict) and 'automation' in data:
-                                pkg_automations = data['automation']
-                                found = False
-                                if isinstance(pkg_automations, list):
-                                    found = any(auto.get('id') == automation_id for auto in pkg_automations)
-                                elif isinstance(pkg_automations, dict):
-                                    found = automation_id in pkg_automations
-                                
-                                if found:
-                                    rel_path = yaml_file.relative_to(file_manager.config_path)
-                                    automation_with_meta['_export_metadata'] = {
-                                        'original_location': 'packages',
-                                        'original_file': str(rel_path)
-                                    }
-                                    break
-                        except Exception:
-                            continue
-                
-                # Check storage if not found in packages
-                if '_export_metadata' not in automation_with_meta:
-                    storage_file = file_manager.config_path / '.storage' / 'automation.storage'
-                    if storage_file.exists():
-                        content = storage_file.read_text(encoding='utf-8')
-                        storage_data = json.loads(content)
-                        if 'data' in storage_data and 'automations' in storage_data['data']:
-                            if any(auto.get('id') == automation_id for auto in storage_data['data']['automations']):
-                                automation_with_meta['_export_metadata'] = {
-                                    'original_location': 'storage',
-                                    'original_file': '.storage/automation.storage'
-                                }
-            except Exception:
-                # If we can't determine location, that's fine - REST API will handle it
-                pass
+            if automation_id in location_cache:
+                automation_with_meta['_export_metadata'] = location_cache[automation_id]
             
             # Write automation to export/automations/<id>.yaml
             automation_file = export_dir / f"{automation_id}.yaml"

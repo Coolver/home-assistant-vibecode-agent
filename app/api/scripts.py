@@ -294,53 +294,61 @@ async def _export_scripts_to_git(commit_message: str):
         export_dir = shadow_root / 'export' / 'scripts'
         export_dir.mkdir(parents=True, exist_ok=True)
         
-        # Export each script to its own file
-        # Also try to determine original location for better rollback support
-        exported_count = 0
-        for script_id, script_config in scripts.items():
-            # Try to find original location (for rollback context)
-            # Note: This is informational only - REST API will handle actual storage location
-            script_with_meta = dict(script_config)
-            try:
-                # Try to determine if script is in packages or storage
-                from app.services.file_manager import file_manager
-                import json
-                from pathlib import Path
-                
-                # Check packages
-                packages_dir = file_manager.config_path / 'packages'
-                if packages_dir.exists():
-                    for yaml_file in packages_dir.rglob('*.yaml'):
-                        try:
-                            content = yaml_file.read_text(encoding='utf-8')
-                            data = yaml.safe_load(content)
-                            if isinstance(data, dict) and 'script' in data:
-                                pkg_scripts = data['script']
-                                if isinstance(pkg_scripts, dict) and script_id in pkg_scripts:
-                                    rel_path = yaml_file.relative_to(file_manager.config_path)
-                                    script_with_meta['_export_metadata'] = {
+        # Cache packages and storage data ONCE to avoid reading files multiple times
+        from app.services.file_manager import file_manager
+        import json
+        from pathlib import Path
+        
+        # Build cache: script_id -> location info
+        location_cache = {}
+        
+        try:
+            # Read all packages files ONCE
+            packages_dir = file_manager.config_path / 'packages'
+            if packages_dir.exists():
+                for yaml_file in packages_dir.rglob('*.yaml'):
+                    try:
+                        content = yaml_file.read_text(encoding='utf-8')
+                        data = yaml.safe_load(content)
+                        if isinstance(data, dict) and 'script' in data:
+                            pkg_scripts = data['script']
+                            rel_path = yaml_file.relative_to(file_manager.config_path)
+                            
+                            if isinstance(pkg_scripts, dict):
+                                for script_id in pkg_scripts.keys():
+                                    location_cache[script_id] = {
                                         'original_location': 'packages',
                                         'original_file': str(rel_path)
                                     }
-                                    break
-                        except Exception:
-                            continue
-                
-                # Check storage if not found in packages
-                if '_export_metadata' not in script_with_meta:
-                    storage_file = file_manager.config_path / '.storage' / 'script.storage'
-                    if storage_file.exists():
-                        content = storage_file.read_text(encoding='utf-8')
-                        storage_data = json.loads(content)
-                        if 'data' in storage_data and 'scripts' in storage_data['data']:
-                            if script_id in storage_data['data']['scripts']:
-                                script_with_meta['_export_metadata'] = {
+                    except Exception:
+                        continue
+            
+            # Read storage file ONCE
+            storage_file = file_manager.config_path / '.storage' / 'script.storage'
+            if storage_file.exists():
+                try:
+                    content = storage_file.read_text(encoding='utf-8')
+                    storage_data = json.loads(content)
+                    if 'data' in storage_data and 'scripts' in storage_data['data']:
+                        for script_id in storage_data['data']['scripts'].keys():
+                            if script_id not in location_cache:
+                                location_cache[script_id] = {
                                     'original_location': 'storage',
                                     'original_file': '.storage/script.storage'
                                 }
-            except Exception:
-                # If we can't determine location, that's fine - REST API will handle it
-                pass
+                except Exception:
+                    pass
+        except Exception:
+            # If we can't build cache, that's fine - we'll just skip metadata
+            pass
+        
+        # Export each script to its own file (using cached location data)
+        exported_count = 0
+        for script_id, script_config in scripts.items():
+            # Add location metadata from cache if available
+            script_with_meta = dict(script_config)
+            if script_id in location_cache:
+                script_with_meta['_export_metadata'] = location_cache[script_id]
             
             # Write script to export/scripts/<id>.yaml
             script_file = export_dir / f"{script_id}.yaml"
