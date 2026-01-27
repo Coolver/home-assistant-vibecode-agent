@@ -186,6 +186,55 @@ async def create_automation(automation: AutomationData):
         logger.error(f"Failed to create automation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.put("/update/{automation_id}", response_model=Response)
+async def update_automation(automation_id: str, automation: AutomationData, commit_message: Optional[str] = Query(None, description="Custom commit message for Git backup")):
+    """
+    Update existing automation via Home Assistant REST API
+    
+    **Important:** This endpoint uses Home Assistant's REST API (POST /api/config/automation/config/{entity_id}).
+    Home Assistant automatically updates the automation in its original location.
+    
+    After update, the automation state is exported to Git for versioning.
+    
+    **Example request:**
+    ```json
+    {
+      "id": "my_automation",
+      "alias": "Updated Automation",
+      "trigger": [...],
+      "action": [...]
+    }
+    ```
+    """
+    try:
+        # Prepare automation config
+        automation_config = automation.model_dump(exclude_none=True)
+        automation_config.pop('commit_message', None)
+        
+        # Ensure ID matches
+        automation_config['id'] = automation_id
+        
+        # Update automation via HA REST API
+        updated_config = await ha_client.update_automation(automation_id, automation_config)
+        
+        # Export current state to Git for versioning
+        commit_msg = commit_message or automation.commit_message or f"Update automation: {automation.alias or automation_id}"
+        await _export_automations_to_git(commit_msg)
+        
+        logger.info(f"Updated automation via API: {automation_id}")
+        
+        return Response(
+            success=True,
+            message=f"Automation updated: {automation.alias or automation_id}",
+            data=updated_config
+        )
+    except Exception as e:
+        error_msg = str(e)
+        if 'not found' in error_msg.lower() or '404' in error_msg:
+            raise HTTPException(status_code=404, detail=f"Automation not found: {automation_id}")
+        logger.error(f"Failed to update automation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/delete/{automation_id}")
 async def delete_automation(automation_id: str, commit_message: Optional[str] = Query(None, description="Custom commit message for Git backup")):
     """

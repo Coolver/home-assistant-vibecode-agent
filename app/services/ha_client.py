@@ -653,42 +653,17 @@ class HomeAssistantClient:
                 if e.get('entity_id', '').startswith('script.')
             ]
             
-            scripts = {}
-            script_ids_seen = set()
+            # Cache for script configurations (read files ONCE at the beginning)
+            script_cache = {}
             
-            # Get script IDs from entity registry
-            for entity in script_entities:
-                entity_id = entity.get('entity_id', '')
-                if not entity_id.startswith('script.'):
-                    continue
-                
-                # Extract script_id from entity_id (script.xxx -> xxx)
-                script_id = entity_id.replace('script.', '', 1)
-                
-                if script_id in script_ids_seen:
-                    continue
-                script_ids_seen.add(script_id)
-                
-                # Try to get script config
-                try:
-                    config = await self.get_script(script_id)
-                    if config:
-                        scripts[script_id] = config
-                except Exception:
-                    # If we can't get config, at least add empty dict
-                    scripts[script_id] = {}
-            
-            # Also try to read from files (for file-based scripts not in registry)
+            # Read all script files ONCE at the beginning
             try:
                 # Read scripts.yaml
                 try:
                     content = await file_manager.read_file('scripts.yaml', suppress_not_found_logging=True)
                     file_scripts = yaml.safe_load(content) or {}
                     if isinstance(file_scripts, dict):
-                        for script_id, script_config in file_scripts.items():
-                            if script_id not in script_ids_seen:
-                                scripts[script_id] = script_config
-                                script_ids_seen.add(script_id)
+                        script_cache.update(file_scripts)
                 except Exception:
                     pass
                 
@@ -703,16 +678,55 @@ class HomeAssistantClient:
                                 if isinstance(data, dict) and 'script' in data:
                                     pkg_scripts = data['script']
                                     if isinstance(pkg_scripts, dict):
-                                        for script_id, script_config in pkg_scripts.items():
-                                            if script_id not in script_ids_seen:
-                                                scripts[script_id] = script_config
-                                                script_ids_seen.add(script_id)
+                                        script_cache.update(pkg_scripts)
                             except Exception:
                                 continue
                 except Exception:
                     pass
+                
+                # Read .storage/script.storage (UI-created scripts)
+                try:
+                    storage_file = file_manager.config_path / '.storage' / 'script.storage'
+                    if storage_file.exists():
+                        content = storage_file.read_text(encoding='utf-8')
+                        storage_data = json.loads(content)
+                        if 'data' in storage_data and 'scripts' in storage_data['data']:
+                            storage_scripts = storage_data['data']['scripts']
+                            if isinstance(storage_scripts, dict):
+                                script_cache.update(storage_scripts)
+                except Exception:
+                    pass
             except Exception as e:
                 logger.warning(f"Failed to read scripts from files: {e}")
+            
+            scripts = {}
+            script_ids_seen = set()
+            
+            # Get script IDs from entity registry and use cache (no file reads here)
+            for entity in script_entities:
+                entity_id = entity.get('entity_id', '')
+                if not entity_id.startswith('script.'):
+                    continue
+                
+                # Extract script_id from entity_id (script.xxx -> xxx)
+                script_id = entity_id.replace('script.', '', 1)
+                
+                if script_id in script_ids_seen:
+                    continue
+                script_ids_seen.add(script_id)
+                
+                # Use cached config if available, otherwise empty dict
+                if script_id in script_cache:
+                    scripts[script_id] = script_cache[script_id]
+                else:
+                    # Script in registry but not in files - might be UI-created
+                    scripts[script_id] = {}
+            
+            # Also add scripts from cache that weren't in entity registry
+            for script_id, script_config in script_cache.items():
+                if script_id not in script_ids_seen:
+                    scripts[script_id] = script_config
+                    script_ids_seen.add(script_id)
             
             return scripts
             

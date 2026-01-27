@@ -1,6 +1,6 @@
 # HA Vibecode Agent - Home Assistant Add-on
 
-[![Version](https://img.shields.io/badge/version-2.10.22-blue.svg)](https://github.com/Coolver/home-assistant-vibecode-agent)
+[![Version](https://img.shields.io/badge/version-2.10.23-blue.svg)](https://github.com/Coolver/home-assistant-vibecode-agent)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![MCP Package](https://img.shields.io/npm/v/@coolver/home-assistant-mcp?label=MCP%20Package)](https://www.npmjs.com/package/@coolver/home-assistant-mcp)
 

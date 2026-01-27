@@ -183,6 +183,49 @@ async def create_script(config: dict):
         logger.error(f"Failed to create script: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.put("/update/{script_id}", response_model=Response)
+async def update_script(script_id: str, config: dict, commit_message: Optional[str] = Query(None, description="Custom commit message for Git backup")):
+    """
+    Update existing script via Home Assistant REST API
+    
+    **Important:** This endpoint uses Home Assistant's REST API (POST /api/config/script/config/{script_id}).
+    Home Assistant automatically updates the script in its original location.
+    
+    After update, the script state is exported to Git for versioning.
+    
+    **Example request:**
+    ```json
+    {
+      "alias": "Updated Script",
+      "sequence": [
+        {"service": "light.turn_on", "target": {"entity_id": "light.living_room"}}
+      ],
+      "mode": "single"
+    }
+    ```
+    """
+    try:
+        # Extract commit_message if present
+        commit_msg = config.pop('commit_message', None) or commit_message
+        
+        # Update script via HA REST API
+        await ha_client.update_script(script_id, config)
+        
+        # Export current state to Git for versioning
+        script_alias = config.get('alias', script_id)
+        commit_msg = commit_msg or f"Update script: {script_alias}"
+        await _export_scripts_to_git(commit_msg)
+        
+        logger.info(f"Updated script via API: {script_id}")
+        
+        return Response(success=True, message=f"Script updated: {script_id}")
+    except Exception as e:
+        error_msg = str(e)
+        if 'not found' in error_msg.lower() or '404' in error_msg:
+            raise HTTPException(status_code=404, detail=f"Script not found: {script_id}")
+        logger.error(f"Failed to update script: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.delete("/delete/{script_id}")
 async def delete_script(script_id: str, commit_message: Optional[str] = Query(None, description="Custom commit message for Git backup")):
     """
