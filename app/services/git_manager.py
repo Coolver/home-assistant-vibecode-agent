@@ -401,13 +401,18 @@ secrets.yaml
             for p in only_paths:
                 _copy_single(p)
         else:
-            # Copy all files from shadow_root (except .git) into /config
+            # Copy all files from shadow_root (except .git, ha_vibecode_git, export) into /config
             for root, dirs, files in os.walk(source_root):
                 if '.git' in dirs:
                     dirs.remove('.git')
+                if 'export' in dirs:
+                    dirs.remove('export')
                 rel_root = os.path.relpath(root, source_root)
                 if rel_root == '.':
                     rel_root = ''
+                # Skip export/ directory - it's agent-managed, not user config
+                if rel_root.startswith('export'):
+                    continue
                 for filename in files:
                     rel_path = os.path.join(rel_root, filename) if rel_root else filename
                     _copy_single(rel_path)
@@ -418,9 +423,14 @@ secrets.yaml
             for root, dirs, files in os.walk(source_root):
                 if '.git' in dirs:
                     dirs.remove('.git')
+                if 'export' in dirs:
+                    dirs.remove('export')
                 rel_root = os.path.relpath(root, source_root)
                 if rel_root == '.':
                     rel_root = ''
+                # Skip export/ directory
+                if rel_root.startswith('export'):
+                    continue
                 for filename in files:
                     rel_path = os.path.join(rel_root, filename) if rel_root else filename
                     rel_path_norm = os.path.normpath(rel_path).replace(os.sep, '/')
