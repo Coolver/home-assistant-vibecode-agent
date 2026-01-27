@@ -252,11 +252,56 @@ async def _export_scripts_to_git(commit_message: str):
         export_dir.mkdir(parents=True, exist_ok=True)
         
         # Export each script to its own file
+        # Also try to determine original location for better rollback support
         exported_count = 0
         for script_id, script_config in scripts.items():
+            # Try to find original location (for rollback context)
+            # Note: This is informational only - REST API will handle actual storage location
+            script_with_meta = dict(script_config)
+            try:
+                # Try to determine if script is in packages or storage
+                from app.services.file_manager import file_manager
+                import json
+                from pathlib import Path
+                
+                # Check packages
+                packages_dir = file_manager.config_path / 'packages'
+                if packages_dir.exists():
+                    for yaml_file in packages_dir.rglob('*.yaml'):
+                        try:
+                            content = yaml_file.read_text(encoding='utf-8')
+                            data = yaml.safe_load(content)
+                            if isinstance(data, dict) and 'script' in data:
+                                pkg_scripts = data['script']
+                                if isinstance(pkg_scripts, dict) and script_id in pkg_scripts:
+                                    rel_path = yaml_file.relative_to(file_manager.config_path)
+                                    script_with_meta['_export_metadata'] = {
+                                        'original_location': 'packages',
+                                        'original_file': str(rel_path)
+                                    }
+                                    break
+                        except Exception:
+                            continue
+                
+                # Check storage if not found in packages
+                if '_export_metadata' not in script_with_meta:
+                    storage_file = file_manager.config_path / '.storage' / 'script.storage'
+                    if storage_file.exists():
+                        content = storage_file.read_text(encoding='utf-8')
+                        storage_data = json.loads(content)
+                        if 'data' in storage_data and 'scripts' in storage_data['data']:
+                            if script_id in storage_data['data']['scripts']:
+                                script_with_meta['_export_metadata'] = {
+                                    'original_location': 'storage',
+                                    'original_file': '.storage/script.storage'
+                                }
+            except Exception:
+                # If we can't determine location, that's fine - REST API will handle it
+                pass
+            
             # Write script to export/scripts/<id>.yaml
             script_file = export_dir / f"{script_id}.yaml"
-            script_yaml = yaml.dump(script_config, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            script_yaml = yaml.dump(script_with_meta, allow_unicode=True, default_flow_style=False, sort_keys=False)
             script_file.write_text(script_yaml, encoding='utf-8')
             exported_count += 1
         
@@ -317,16 +362,29 @@ async def _apply_scripts_from_git_export(export_dir: Path) -> int:
                 
                 script_id = script_file.stem
                 
+                # Remove export metadata (if present) before applying
+                # This metadata is only for informational purposes
+                export_metadata = script_config.pop('_export_metadata', None)
+                
                 # Check if script exists
                 try:
                     existing = await ha_client.get_script(script_id)
-                    # Update existing script
+                    # Update existing script via REST API
+                    # REST API will preserve original location if script still exists
                     await ha_client.update_script(script_id, script_config)
-                    logger.debug(f"Updated script from Git export: {script_id}")
+                    logger.debug(f"Updated script from Git export: {script_id}" + 
+                               (f" (was in {export_metadata.get('original_file')})" if export_metadata else ""))
                 except Exception:
-                    # Script doesn't exist, create it
+                    # Script doesn't exist, create it via REST API
+                    # Note: New scripts are created in scripts.yaml by default
+                    # If original location was packages/*, user may need to move it manually
                     await ha_client.create_script(script_id, script_config)
-                    logger.debug(f"Created script from Git export: {script_id}")
+                    if export_metadata and export_metadata.get('original_location') != 'scripts.yaml':
+                        logger.info(f"Created script from Git export: {script_id} "
+                                  f"(original location was {export_metadata.get('original_file')}, "
+                                  f"but REST API created it in scripts.yaml - may need manual move)")
+                    else:
+                        logger.debug(f"Created script from Git export: {script_id}")
                 
                 applied_count += 1
                 

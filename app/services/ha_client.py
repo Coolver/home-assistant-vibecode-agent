@@ -475,12 +475,76 @@ class HomeAssistantClient:
             logger.error(f"Failed to update automation {automation_id} via REST API: {e}")
             raise
     
+    async def _find_automation_location(self, automation_id: str) -> Dict:
+        """
+        Find where an automation is stored (automations.yaml, packages/*.yaml, or .storage)
+        
+        Returns:
+            Dict with keys: 'location' ('automations.yaml', 'packages', or 'storage'),
+                           'file_path' (relative path), 'index' (if applicable)
+        """
+        from app.services.file_manager import file_manager
+        import yaml
+        import json
+        from pathlib import Path
+        
+        # Try automations.yaml
+        try:
+            content = await file_manager.read_file('automations.yaml', suppress_not_found_logging=True)
+            automations = yaml.safe_load(content) or []
+            if isinstance(automations, list):
+                for i, auto in enumerate(automations):
+                    if auto.get('id') == automation_id:
+                        return {'location': 'automations.yaml', 'file_path': 'automations.yaml', 'index': i}
+        except Exception:
+            pass
+        
+        # Try packages/*.yaml
+        try:
+            packages_dir = file_manager.config_path / 'packages'
+            if packages_dir.exists():
+                for yaml_file in packages_dir.rglob('*.yaml'):
+                    try:
+                        content = yaml_file.read_text(encoding='utf-8')
+                        data = yaml.safe_load(content)
+                        if isinstance(data, dict) and 'automation' in data:
+                            pkg_automations = data['automation']
+                            rel_path = yaml_file.relative_to(file_manager.config_path)
+                            
+                            if isinstance(pkg_automations, list):
+                                for i, auto in enumerate(pkg_automations):
+                                    if auto.get('id') == automation_id:
+                                        return {'location': 'packages', 'file_path': str(rel_path), 'index': i, 'format': 'list'}
+                            elif isinstance(pkg_automations, dict):
+                                if automation_id in pkg_automations:
+                                    return {'location': 'packages', 'file_path': str(rel_path), 'key': automation_id, 'format': 'dict'}
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+        
+        # Try .storage (UI-created)
+        try:
+            storage_file = file_manager.config_path / '.storage' / 'automation.storage'
+            if storage_file.exists():
+                content = storage_file.read_text(encoding='utf-8')
+                storage_data = json.loads(content)
+                if 'data' in storage_data and 'automations' in storage_data['data']:
+                    for i, auto in enumerate(storage_data['data']['automations']):
+                        if auto.get('id') == automation_id:
+                            return {'location': 'storage', 'file_path': '.storage/automation.storage', 'index': i}
+        except Exception:
+            pass
+        
+        return None
+    
     async def delete_automation(self, automation_id: str) -> Dict:
         """
-        Delete automation via Home Assistant REST API
+        Delete automation from its original location (file-based approach)
         
-        Uses DELETE /api/config/automation/config/{entity_id} endpoint.
-        Home Assistant automatically removes the automation from its original location.
+        Note: Home Assistant REST API does not support DELETE method for automations.
+        We find where the automation is stored and remove it from there, then remove
+        from Entity Registry and reload automations.
         
         Args:
             automation_id: Automation ID to delete
@@ -489,19 +553,71 @@ class HomeAssistantClient:
             Deletion result
         """
         try:
-            # Use REST API endpoint: DELETE /api/config/automation/config/{entity_id}
-            entity_id = f"automation.{automation_id}"
-            endpoint = f"config/automation/config/{entity_id}"
+            from app.services.file_manager import file_manager
+            import yaml
+            import json
             
-            result = await self._request('DELETE', endpoint)
+            # Find where automation is located
+            location = await self._find_automation_location(automation_id)
+            if not location:
+                raise Exception(f"Automation '{automation_id}' not found")
             
-            logger.info(f"Deleted automation via REST API: {automation_id}")
-            return {'success': True, 'automation_id': automation_id, 'result': result}
+            file_path = location['file_path']
+            
+            if location['location'] == 'automations.yaml':
+                # Delete from automations.yaml
+                content = await file_manager.read_file(file_path)
+                automations = yaml.safe_load(content) or []
+                automations = [auto for auto in automations if auto.get('id') != automation_id]
+                new_content = yaml.dump(automations, allow_unicode=True, default_flow_style=False, sort_keys=False)
+                await file_manager.write_file(file_path, new_content, create_backup=True)
+                
+            elif location['location'] == 'packages':
+                # Delete from packages/*.yaml
+                content = await file_manager.read_file(file_path)
+                data = yaml.safe_load(content) or {}
+                if location['format'] == 'list':
+                    data['automation'] = [auto for auto in data['automation'] if auto.get('id') != automation_id]
+                else:  # dict format
+                    if location['key'] in data['automation']:
+                        del data['automation'][location['key']]
+                new_content = yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False)
+                await file_manager.write_file(file_path, new_content, create_backup=True)
+                
+            elif location['location'] == 'storage':
+                # Delete from .storage/automation.storage (JSON)
+                content = await file_manager.read_file(file_path)
+                storage_data = json.loads(content)
+                storage_data['data']['automations'] = [auto for auto in storage_data['data']['automations'] if auto.get('id') != automation_id]
+                new_content = json.dumps(storage_data, indent=2, ensure_ascii=False)
+                await file_manager.write_file(file_path, new_content, create_backup=True)
+            
+            # Remove from Entity Registry
+            try:
+                from app.services.ha_websocket import get_ws_client
+                ws_client = await get_ws_client()
+                entity_id = f"automation.{automation_id}"
+                await ws_client.remove_entity_registry_entry(entity_id)
+                logger.debug(f"Removed automation from Entity Registry: {entity_id}")
+            except Exception as reg_error:
+                logger.warning(f"Failed to remove automation from Entity Registry: {reg_error}")
+            
+            # Reload automations in Home Assistant
+            try:
+                from app.services.ha_websocket import get_ws_client
+                ws_client = await get_ws_client()
+                await ws_client.call_service('automation', 'reload')
+                logger.info(f"Reloaded automations after deleting: {automation_id}")
+            except Exception as reload_error:
+                logger.warning(f"Failed to reload automations: {reload_error}. Automation deleted but may need manual reload.")
+            
+            logger.info(f"Deleted automation from {file_path}: {automation_id}")
+            return {'success': True, 'automation_id': automation_id}
         except Exception as e:
             error_msg = str(e)
-            if '404' in error_msg or 'not found' in error_msg.lower():
+            if 'not found' in error_msg.lower():
                 raise Exception(f"Automation not found: {automation_id}")
-            logger.error(f"Failed to delete automation {automation_id} via REST API: {e}")
+            logger.error(f"Failed to delete automation {automation_id}: {e}")
             raise
     
     # ==================== Script API ====================
@@ -670,7 +786,11 @@ class HomeAssistantClient:
     
     async def create_script(self, script_id: str, script_config: Dict) -> Dict:
         """
-        Create new script via WebSocket API
+        Create new script via Home Assistant REST API
+        
+        Uses POST /api/config/script/config/{script_id} endpoint.
+        Home Assistant automatically determines where to store the script
+        (scripts.yaml, packages/*, or .storage).
         
         Args:
             script_id: Script ID
@@ -680,29 +800,26 @@ class HomeAssistantClient:
             Created script configuration
         """
         try:
-            # Import here to avoid circular dependency
-            from app.services.ha_websocket import get_ws_client
+            # Use REST API endpoint: POST /api/config/script/config/{script_id}
+            endpoint = f"config/script/config/{script_id}"
             
-            ws_client = await get_ws_client()
-            result = await ws_client._send_message({
-                'type': 'config/script/create',
-                'script_id': script_id,
-                **script_config
-            })
+            result = await self._request('POST', endpoint, data=script_config)
             
-            # Handle wrapped response format
-            if isinstance(result, dict) and 'result' in result:
-                result = result['result']
-            
-            logger.info(f"Created script via WebSocket API: {script_id}")
+            logger.info(f"Created script via REST API: {script_id}")
             return result
         except Exception as e:
-            logger.error(f"Failed to create script {script_id} via WebSocket API: {e}")
+            error_msg = str(e)
+            if '409' in error_msg or 'already exists' in error_msg.lower():
+                raise ValueError(f"Script with ID '{script_id}' already exists")
+            logger.error(f"Failed to create script {script_id} via REST API: {e}")
             raise
     
     async def update_script(self, script_id: str, script_config: Dict) -> Dict:
         """
-        Update existing script via WebSocket API
+        Update existing script via Home Assistant REST API
+        
+        Uses POST /api/config/script/config/{script_id} endpoint.
+        Home Assistant automatically updates the script in its original location.
         
         Args:
             script_id: Script ID
@@ -712,29 +829,84 @@ class HomeAssistantClient:
             Updated script configuration
         """
         try:
-            # Import here to avoid circular dependency
-            from app.services.ha_websocket import get_ws_client
+            # Use REST API endpoint: POST /api/config/script/config/{script_id}
+            endpoint = f"config/script/config/{script_id}"
             
-            ws_client = await get_ws_client()
-            result = await ws_client._send_message({
-                'type': 'config/script/update',
-                'script_id': script_id,
-                **script_config
-            })
+            result = await self._request('POST', endpoint, data=script_config)
             
-            # Handle wrapped response format
-            if isinstance(result, dict) and 'result' in result:
-                result = result['result']
-            
-            logger.info(f"Updated script via WebSocket API: {script_id}")
+            logger.info(f"Updated script via REST API: {script_id}")
             return result
         except Exception as e:
-            logger.error(f"Failed to update script {script_id} via WebSocket API: {e}")
+            error_msg = str(e)
+            if '404' in error_msg or 'not found' in error_msg.lower():
+                raise Exception(f"Script '{script_id}' not found")
+            logger.error(f"Failed to update script {script_id} via REST API: {e}")
             raise
+    
+    async def _find_script_location(self, script_id: str) -> Dict:
+        """
+        Find where a script is stored (scripts.yaml, packages/*.yaml, or .storage)
+        
+        Returns:
+            Dict with keys: 'location' ('scripts.yaml', 'packages', or 'storage'),
+                           'file_path' (relative path)
+        """
+        from app.services.file_manager import file_manager
+        import yaml
+        import json
+        from pathlib import Path
+        
+        # Try scripts.yaml
+        try:
+            content = await file_manager.read_file('scripts.yaml', suppress_not_found_logging=True)
+            scripts = yaml.safe_load(content) or {}
+            if isinstance(scripts, dict) and script_id in scripts:
+                return {'location': 'scripts.yaml', 'file_path': 'scripts.yaml'}
+        except Exception:
+            pass
+        
+        # Try packages/*.yaml
+        try:
+            packages_dir = file_manager.config_path / 'packages'
+            if packages_dir.exists():
+                for yaml_file in packages_dir.rglob('*.yaml'):
+                    try:
+                        content = yaml_file.read_text(encoding='utf-8')
+                        data = yaml.safe_load(content)
+                        if isinstance(data, dict) and 'script' in data:
+                            pkg_scripts = data['script']
+                            rel_path = yaml_file.relative_to(file_manager.config_path)
+                            
+                            if isinstance(pkg_scripts, dict) and script_id in pkg_scripts:
+                                return {'location': 'packages', 'file_path': str(rel_path)}
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+        
+        # Try .storage (UI-created)
+        try:
+            storage_file = file_manager.config_path / '.storage' / 'script.storage'
+            if storage_file.exists():
+                content = storage_file.read_text(encoding='utf-8')
+                storage_data = json.loads(content)
+                if 'data' in storage_data and 'scripts' in storage_data['data']:
+                    scripts_dict = storage_data['data']['scripts']
+                    if script_id in scripts_dict:
+                        return {'location': 'storage', 'file_path': '.storage/script.storage'}
+        except Exception:
+            pass
+        
+        return None
     
     async def delete_script(self, script_id: str) -> Dict:
         """
-        Delete script via WebSocket API
+        Delete script from its original location (file-based approach)
+        
+        Note: Home Assistant REST API does not support DELETE method for scripts
+        (only works for UI-created scripts, returns 405 for YAML-defined ones).
+        We find where the script is stored and remove it from there, then remove
+        from Entity Registry and reload scripts.
         
         Args:
             script_id: Script ID to delete
@@ -743,26 +915,71 @@ class HomeAssistantClient:
             Deletion result
         """
         try:
-            # Import here to avoid circular dependency
-            from app.services.ha_websocket import get_ws_client
+            from app.services.file_manager import file_manager
+            import yaml
+            import json
             
-            ws_client = await get_ws_client()
-            result = await ws_client._send_message({
-                'type': 'config/script/delete',
-                'script_id': script_id
-            })
+            # Find where script is located
+            location = await self._find_script_location(script_id)
+            if not location:
+                raise Exception(f"Script '{script_id}' not found")
             
-            # Handle wrapped response format
-            if isinstance(result, dict) and 'result' in result:
-                result = result['result']
+            file_path = location['file_path']
             
-            logger.info(f"Deleted script via WebSocket API: {script_id}")
-            return result
+            if location['location'] == 'scripts.yaml':
+                # Delete from scripts.yaml
+                content = await file_manager.read_file(file_path)
+                scripts = yaml.safe_load(content) or {}
+                if script_id in scripts:
+                    del scripts[script_id]
+                new_content = yaml.dump(scripts, allow_unicode=True, default_flow_style=False, sort_keys=False)
+                await file_manager.write_file(file_path, new_content, create_backup=True)
+                
+            elif location['location'] == 'packages':
+                # Delete from packages/*.yaml
+                content = await file_manager.read_file(file_path)
+                data = yaml.safe_load(content) or {}
+                if 'script' in data and script_id in data['script']:
+                    del data['script'][script_id]
+                new_content = yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False)
+                await file_manager.write_file(file_path, new_content, create_backup=True)
+                
+            elif location['location'] == 'storage':
+                # Delete from .storage/script.storage (JSON)
+                content = await file_manager.read_file(file_path)
+                storage_data = json.loads(content)
+                if 'data' in storage_data and 'scripts' in storage_data['data']:
+                    if script_id in storage_data['data']['scripts']:
+                        del storage_data['data']['scripts'][script_id]
+                new_content = json.dumps(storage_data, indent=2, ensure_ascii=False)
+                await file_manager.write_file(file_path, new_content, create_backup=True)
+            
+            # Remove from Entity Registry
+            try:
+                from app.services.ha_websocket import get_ws_client
+                ws_client = await get_ws_client()
+                entity_id = f"script.{script_id}"
+                await ws_client.remove_entity_registry_entry(entity_id)
+                logger.debug(f"Removed script from Entity Registry: {entity_id}")
+            except Exception as reg_error:
+                logger.warning(f"Failed to remove script from Entity Registry: {reg_error}")
+            
+            # Reload scripts in Home Assistant
+            try:
+                from app.services.ha_websocket import get_ws_client
+                ws_client = await get_ws_client()
+                await ws_client.call_service('script', 'reload')
+                logger.info(f"Reloaded scripts after deleting: {script_id}")
+            except Exception as reload_error:
+                logger.warning(f"Failed to reload scripts: {reload_error}. Script deleted but may need manual reload.")
+            
+            logger.info(f"Deleted script from {file_path}: {script_id}")
+            return {'success': True, 'script_id': script_id}
         except Exception as e:
             error_msg = str(e)
-            if '404' in error_msg or 'not found' in error_msg.lower():
+            if 'not found' in error_msg.lower():
                 raise Exception(f"Script not found: {script_id}")
-            logger.error(f"Failed to delete script {script_id} via WebSocket API: {e}")
+            logger.error(f"Failed to delete script {script_id}: {e}")
             raise
 
 # Global client instance
