@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.10.13] - 2026-01-20
+## [2.10.14] - 2026-01-20
 
 ### 🚀 API-based automation & script management + Security fix
 
@@ -37,7 +37,7 @@ We've completely rebuilt how the agent interacts with automations and scripts. I
 
 #### Security Fix (from PR #22)
 
-- ✅ **Secure API key regeneration**: The `/api/regenerate-key` endpoint now requires authentication (valid API key in `Authorization: Bearer <key>` header) to prevent unauthorized key regeneration from arbitrary web pages. The UI still works seamlessly by passing the current key in the request header.
+- ✅ **Secure API key regeneration**: The `/api/regenerate-key` endpoint now requires authentication (valid API key in `Authorization: Bearer <key>` header) to prevent unauthorized key regeneration from arbitrary web pages. Previously, any website could call this endpoint and regenerate your API key without authentication, creating a critical security vulnerability. The UI still works seamlessly by passing the current key in the request header when regenerating keys.
 
 ## [2.10.12] - 2026-01-20
 
