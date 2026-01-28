@@ -1,6 +1,6 @@
 # 🧪 Home Assistant Agent - Comprehensive Test Suite
 
-**Version:** 2.10.5  
+**Version:** 2.10.34  
 **Purpose:** Complete testing of all HA Cursor Agent MCP functions  
 **Usage:** Say "run Home Assistant Agent test suite" to run full suite
 
@@ -12,7 +12,7 @@
 - [Entities](#2-entity-operations-2-tests) (2 tests)
 - [Registries](#13-registry-operations-13-tests) (13 tests)
 - [Helpers](#3-helper-operations-2-tests) (2 tests)
-- [Automations](#4-automation-operations-2-tests) (2 tests)
+- [Automations](#4-automation-operations-6-tests) (6 tests)
 - [Scripts](#5-script-operations-2-tests) (2 tests)
 - [Git/Backup](#6-gitbackup-operations-4-tests) (4 tests)
 - [System](#7-system-operations-4-tests) (4 tests)
@@ -22,7 +22,7 @@
 - [Repositories](#11-repository-operations-2-tests) (2 tests)
 - [Logbook](#12-logbook-operations-1-test) (1 test)
 
-**Total:** 65 tests
+**Total:** 69 tests
 
 ---
 
@@ -145,13 +145,27 @@
 
 ---
 
-## 4. Automation Operations (3 tests)
+## 4. Automation Operations (6 tests)
 
 ### test_list_automations
 **Function:** `ha_list_automations`  
 **Parameters:** `{}`  
 **Expected:** List of automations  
 **Success:** Returns array with automation objects
+
+### test_list_automations_ids_only
+**Function:** `ha_list_automations`  
+**Parameters:** `{ ids_only: true }`  
+**Expected:** List of automation IDs only (no full configs)  
+**Success:** Returns array of strings (automation IDs)  
+**Note:** Useful for quick checks without loading full configurations
+
+### test_get_automation_by_id
+**Function:** `ha_get_automation`  
+**Parameters:** `{ automation_id: "<existing_automation_id>" }`  
+**Expected:** Full automation configuration  
+**Success:** Returns automation object with `id`, `alias`, `trigger`, `action`, etc.  
+**Note:** Works with automations from `automations.yaml`, `packages/*.yaml`, and `.storage`
 
 ### test_create_test_automation
 **Function:** `ha_create_automation`  
@@ -192,6 +206,34 @@
 **Expected:** Automation deleted successfully  
 **Success:** Automation removed from list, subsequent get returns error/not found  
 **Note:** ⚠️ DESTRUCTIVE - only test with test automations created for this purpose
+
+### test_delete_ghost_automation_from_entity_registry
+**Function:** `ha_delete_automation`  
+**Steps:**
+1. Create test automation: `ha_create_automation` with test config (id: "test_ghost_automation", alias: "Test Ghost Automation")
+2. Verify automation exists in list
+3. Manually remove automation from storage (simulate ghost entry scenario) OR wait for Entity Registry to have entry but storage to be cleared
+4. Delete automation: `ha_delete_automation` with `{ automation_id: "test_ghost_automation" }` OR `{ automation_id: "test_ghost_automation" }` (by alias)
+5. Verify automation no longer appears in list  
+**Expected:** Ghost automation deleted from Entity Registry successfully  
+**Success:** Automation removed from Entity Registry even if not found in storage  
+**Note:** ⚠️ Tests the new functionality to remove "ghost" entries from Entity Registry by matching id and alias  
+**Details:** This test verifies that `delete_automation` can:
+- Find automations in Entity Registry by `id` when not found in storage
+- Find automations in Entity Registry by `alias` when not found in storage
+- Remove all matching entries from Entity Registry
+- Reload automations to sync Entity Registry
+
+### test_delete_automation_with_alias_matching
+**Function:** `ha_delete_automation`  
+**Steps:**
+1. Create test automation: `ha_create_automation` with test config (id: "test_alias_match_123", alias: "Test Alias Match Automation")
+2. Verify automation exists in list with both id and alias visible
+3. Delete automation by alias-like id: `ha_delete_automation` with `{ automation_id: "test_alias_match" }` (partial match)
+4. Verify automation no longer appears in list  
+**Expected:** Automation deleted successfully by alias matching  
+**Success:** Automation removed even when Entity Registry uses different entity_id than storage id  
+**Note:** ⚠️ Tests alias-based matching when Entity Registry entity_id differs from automation id in storage
 
 ---
 
@@ -593,9 +635,9 @@
 
 To avoid context loss during large test runs, tests are broken down into small, manageable steps. Execute 3-5 steps at a time, then pause and continue.
 
-**Total Steps:** 35  
-**Read-Only Steps:** 25  
-**Write Steps:** 10
+**Total Steps:** 40  
+**Read-Only Steps:** 27  
+**Write Steps:** 13
 
 #### Phase 1: Read-Only File Operations (4 steps)
 
@@ -675,12 +717,22 @@ To avoid context loss during large test runs, tests are broken down into small, 
 - **Parameters:** `{}`  
 - **Expected:** List of existing helpers
 
-#### Phase 5: Read-Only Automation Operations (1 step)
+#### Phase 5: Read-Only Automation Operations (3 steps)
 
 **Step 5.1:** `test_list_automations`  
 - **MCP Tool:** `ha_list_automations`  
 - **Parameters:** `{}`  
 - **Expected:** List of automations
+
+**Step 5.2:** `test_list_automations_ids_only`  
+- **MCP Tool:** `ha_list_automations`  
+- **Parameters:** `{ ids_only: true }`  
+- **Expected:** List of automation IDs only
+
+**Step 5.3:** `test_get_automation_by_id`  
+- **MCP Tool:** `ha_get_automation`  
+- **Parameters:** `{ automation_id: "<existing_automation_id>" }`  
+- **Expected:** Full automation configuration
 
 #### Phase 6: Read-Only Script Operations (1 step)
 
@@ -776,7 +828,7 @@ To avoid context loss during large test runs, tests are broken down into small, 
 - **Parameters:** `{ entity_id: "input_boolean.test_agent_helper" }`  
 - **Expected:** Helper deleted successfully
 
-#### Phase 15: Write Operations - Automation (2 steps)
+#### Phase 15: Write Operations - Automation (4 steps)
 
 **Step 15.1:** `test_create_test_automation`  
 - **MCP Tool:** `ha_create_automation`  
@@ -788,6 +840,26 @@ To avoid context loss during large test runs, tests are broken down into small, 
 - **MCP Tool:** `ha_delete_automation`  
 - **Parameters:** `{ automation_id: "test_agent_automation" }`  
 - **Expected:** Automation deleted successfully
+
+**Step 15.3:** `test_delete_ghost_automation_from_entity_registry`  
+- **MCP Tool:** `ha_delete_automation`  
+- **Steps:**
+  1. Create test automation with id: "test_ghost_automation"
+  2. Verify it exists in list
+  3. Delete automation: `ha_delete_automation` with `{ automation_id: "test_ghost_automation" }`
+  4. Verify it's removed from Entity Registry even if not in storage  
+- **Expected:** Ghost automation deleted from Entity Registry successfully  
+- **Note:** Tests removal of "ghost" entries by matching id and alias
+
+**Step 15.4:** `test_delete_automation_with_alias_matching`  
+- **MCP Tool:** `ha_delete_automation`  
+- **Steps:**
+  1. Create test automation with id: "test_alias_match_123", alias: "Test Alias Match"
+  2. Verify it exists in list
+  3. Delete automation by partial alias match: `ha_delete_automation` with `{ automation_id: "test_alias_match" }`
+  4. Verify it's removed successfully  
+- **Expected:** Automation deleted successfully by alias matching  
+- **Note:** Tests alias-based matching when Entity Registry entity_id differs from storage id
 
 #### Phase 16: Write Operations - Script (2 steps)
 
@@ -1066,7 +1138,7 @@ HA_AGENT_KEY=<your-token>
 
 ---
 
-**Last Updated:** 2025-12-09  
-**Test Suite Version:** 1.1.0  
-**Compatible with:** HA Cursor Agent v2.10.5+
+**Last Updated:** 2026-01-27  
+**Test Suite Version:** 1.2.0  
+**Compatible with:** HA Cursor Agent v2.10.34+
 
