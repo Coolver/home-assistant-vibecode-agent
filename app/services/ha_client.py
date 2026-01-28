@@ -365,8 +365,21 @@ class HomeAssistantClient:
                     full_config = await self.get_automation(automation_id)
                     automations.append(full_config)
                 except Exception:
-                    # Last resort: search in .storage by entity_id if automation_id didn't work
-                    # Some UI-created automations have different id vs entity_id
+                    # Last resort: try REST API to get automation by entity_id
+                    # Some UI-created automations have different id vs entity_id, and storage may not have entity_id field
+                    try:
+                        endpoint = f"config/automation/config/{entity_id}"
+                        try:
+                            api_result = await self._request('GET', endpoint)
+                            if api_result:
+                                automations.append(api_result)
+                                continue
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+                    
+                    # If REST API didn't work, search in .storage by entity_id
                     try:
                         storage_file = file_manager.config_path / '.storage' / 'automation.storage'
                         if storage_file.exists():
