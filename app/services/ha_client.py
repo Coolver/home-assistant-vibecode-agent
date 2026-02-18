@@ -635,14 +635,17 @@ class HomeAssistantClient:
         Returns the resolved config ID, or the original automation_id if no
         resolution is needed or possible.
         """
-        # Quick check: if the ID exists directly in a config file, no resolution needed
+        # Quick check: if get_automation finds it, use the actual config ID from the result
         try:
-            await self.get_automation(automation_id)
-            return automation_id
+            auto = await self.get_automation(automation_id)
+            config_id = auto.get('id', automation_id)
+            if config_id != automation_id:
+                logger.info(f"Resolved automation slug '{automation_id}' -> config id '{config_id}'")
+            return config_id
         except Exception:
             pass
 
-        # Resolve via Entity Registry
+        # Fallback: resolve via Entity Registry
         try:
             from app.services.ha_websocket import get_ws_client
             ws_client = await get_ws_client()
