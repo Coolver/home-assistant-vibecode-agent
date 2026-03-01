@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.39] - 2026-02-18
+
+### 🔧 Allow YAML files with Home Assistant custom tags in `ha_write_file` (reported by @ghzgod)
+
+- **Issue**: The file write endpoint rejected valid YAML that uses HA custom tags such as `!include`, `!include_dir_merge_named`, etc., with an error like: *"Invalid YAML in configuration.yaml: could not determine a constructor for the tag '!include'"*. Users had to fall back to SSH to edit `configuration.yaml` and other files that rely on these directives.
+- **Cause**: Validation used `yaml.safe_load()`, which only supports standard YAML types and does not handle custom tags. Home Assistant uses `!include` and related tags throughout configs, so such files were incorrectly treated as invalid.
+- **Fix**: Introduced a custom SafeLoader that treats unknown `!…` tags as opaque placeholders during validation. The document is only checked for parseability; includes are not resolved. File content is written as-is. Both `write` and `append` now accept YAML containing `!include`, `!include_dir_merge_named`, and other HA tags.
+- **Thanks**: Bug reported by [@ghzgod](https://github.com/ghzgod). Thank you for the clear description and steps to reproduce.
+
 ## [2.10.38] - 2026-02-18
 
 ### 🔧 Accept plural automation fields (thanks to @CrazyCoder, PR #26)

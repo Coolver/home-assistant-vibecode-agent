@@ -19,19 +19,47 @@ def _is_yaml_path(path: str) -> bool:
     return lower.endswith(".yaml") or lower.endswith(".yml")
 
 
+class _HAAllowTagLoader(yaml.SafeLoader):
+    """SafeLoader that treats unknown !tags (e.g. !include) as placeholders."""
+
+    pass
+
+
+def _unknown_tag_constructor(loader, tag_suffix, node):
+    if isinstance(node, yaml.ScalarNode):
+        return node.value or ""
+    return None
+
+
+_HAAllowTagLoader.add_multi_constructor("!", _unknown_tag_constructor)
+
+
+def _safe_load_yaml_allow_ha_tags(content: str):
+    """
+    Load YAML like safe_load but allow Home Assistant custom tags (!include,
+    !include_dir_merge_named, etc.) by treating them as opaque placeholders.
+    We only validate that the document is parseable; we do not resolve includes.
+    """
+    return yaml.load(content or "", Loader=_HAAllowTagLoader)
+
+
 def _validate_yaml_syntax(path: str, content: str) -> None:
     """
     Basic YAML syntax validation.
 
     Prevents writing obviously invalid YAML that would break Home Assistant.
+    Accepts HA custom tags (!include, !include_dir_merge_named, etc.) without
+    resolving them; only checks that the document is parseable.
     """
     if not _is_yaml_path(path):
         return
 
     try:
-        # We don't care about structure here, only that YAML parses
-        yaml.safe_load(content or "")  # empty file is valid YAML (None)
-    except Exception as e:  # yaml.YAMLError and others
+        _safe_load_yaml_allow_ha_tags(content or "")
+    except yaml.YAMLError as e:
+        logger.error(f"Invalid YAML when writing {path}: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid YAML in {path}: {e}")
+    except Exception as e:
         logger.error(f"Invalid YAML when writing {path}: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid YAML in {path}: {e}")
 
@@ -53,7 +81,7 @@ def _validate_automations_structure(path: str, content: str) -> None:
         return
 
     try:
-        data = yaml.safe_load(content or "")
+        data = _safe_load_yaml_allow_ha_tags(content or "")
     except Exception as e:
         # Syntax errors are handled separately in _validate_yaml_syntax
         logger.debug(f"Skipping automations structure check for {path} due to YAML error: {e}")

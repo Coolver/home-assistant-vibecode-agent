@@ -1,6 +1,6 @@
 # 🧪 Home Assistant Agent - Comprehensive Test Suite
 
-**Version:** 2.10.38  
+**Version:** 2.10.39  
 **Purpose:** Complete testing of all HA Cursor Agent MCP functions  
 **Usage:** Say "run Home Assistant Agent test suite" to run full suite
 
@@ -1140,5 +1140,5 @@ HA_AGENT_KEY=<your-token>
 
 **Last Updated:** 2026-01-27  
 **Test Suite Version:** 1.2.0  
-**Compatible with:** HA Cursor Agent v2.10.38+
+**Compatible with:** HA Cursor Agent v2.10.39+
 
