@@ -289,7 +289,26 @@ class HomeAssistantClient:
                             continue
             except Exception:
                 pass
-            
+
+            # Read automations/*.yaml files ONCE (for !include_dir_merge_list automations/)
+            try:
+                automations_dir = file_manager.config_path / 'automations'
+                if automations_dir.exists() and automations_dir.is_dir():
+                    for yaml_file in automations_dir.rglob('*.yaml'):
+                        try:
+                            content = yaml_file.read_text(encoding='utf-8')
+                            data = yaml.safe_load(content)
+                            if isinstance(data, list):
+                                for auto in data:
+                                    if isinstance(auto, dict):
+                                        auto_id = auto.get('id')
+                                        if auto_id and auto_id not in automation_cache:
+                                            automation_cache[auto_id] = auto
+                        except Exception:
+                            continue
+            except Exception:
+                pass
+
             # Read .storage (UI-created automations) ONCE
             try:
                 storage_file = file_manager.config_path / '.storage' / 'automation.storage'
@@ -488,7 +507,24 @@ class HomeAssistantClient:
                             continue
             except Exception:
                 pass
-            
+
+            # Try to find in automations/*.yaml (for !include_dir_merge_list automations/)
+            try:
+                automations_dir = file_manager.config_path / 'automations'
+                if automations_dir.exists() and automations_dir.is_dir():
+                    for yaml_file in automations_dir.rglob('*.yaml'):
+                        try:
+                            content = yaml_file.read_text(encoding='utf-8')
+                            data = yaml.safe_load(content)
+                            if isinstance(data, list):
+                                for auto in data:
+                                    if isinstance(auto, dict) and auto.get('id') == automation_id:
+                                        return auto
+                        except Exception:
+                            continue
+            except Exception:
+                pass
+
             # Try to find in .storage (UI-created automations)
             try:
                 storage_file = file_manager.config_path / '.storage' / 'automation.storage'
@@ -753,7 +789,28 @@ class HomeAssistantClient:
                         continue
         except Exception:
             pass
-        
+
+        # Try automations/*.yaml (for !include_dir_merge_list automations/)
+        try:
+            automations_dir = file_manager.config_path / 'automations'
+            if automations_dir.exists() and automations_dir.is_dir():
+                for yaml_file in automations_dir.rglob('*.yaml'):
+                    try:
+                        content = yaml_file.read_text(encoding='utf-8')
+                        data = yaml.safe_load(content)
+                        if isinstance(data, list):
+                            for i, auto in enumerate(data):
+                                if isinstance(auto, dict) and matches_automation(auto, automation_id):
+                                    rel_path = yaml_file.relative_to(file_manager.config_path)
+                                    result = {'location': 'automations_dir', 'file_path': str(rel_path), 'index': i, 'format': 'list'}
+                                    if auto.get('entity_id'):
+                                        result['entity_id'] = auto.get('entity_id')
+                                    return result
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
         # Try .storage (UI-created)
         try:
             storage_file = file_manager.config_path / '.storage' / 'automation.storage'
@@ -878,7 +935,15 @@ class HomeAssistantClient:
                 storage_data['data']['automations'] = [auto for auto in storage_data['data']['automations'] if auto.get('id') != automation_id]
                 new_content = json.dumps(storage_data, indent=2, ensure_ascii=False)
                 await file_manager.write_file(file_path, new_content, create_backup=True)
-            
+
+            elif location['location'] == 'automations_dir':
+                # Delete from automations/*.yaml (flat list format)
+                content = await file_manager.read_file(file_path)
+                automations = yaml.safe_load(content) or []
+                automations = [auto for auto in automations if auto.get('id') != automation_id]
+                new_content = yaml.dump(automations, allow_unicode=True, default_flow_style=False, sort_keys=False)
+                await file_manager.write_file(file_path, new_content, create_backup=True)
+
             # Remove from Entity Registry - try to match by id, entity_id, and alias
             try:
                 from app.services.ha_websocket import get_ws_client
@@ -1036,6 +1101,23 @@ class HomeAssistantClient:
                 except Exception:
                     pass
                 
+                # Read scripts/*.yaml files (for !include_dir_merge_named scripts/)
+                try:
+                    scripts_dir = file_manager.config_path / 'scripts'
+                    if scripts_dir.exists() and scripts_dir.is_dir():
+                        for yaml_file in scripts_dir.rglob('*.yaml'):
+                            try:
+                                content = yaml_file.read_text(encoding='utf-8')
+                                data = yaml.safe_load(content)
+                                if isinstance(data, dict):
+                                    for sid, sconfig in data.items():
+                                        if sid not in script_cache:
+                                            script_cache[sid] = sconfig
+                            except Exception:
+                                continue
+                except Exception:
+                    pass
+
                 # Read .storage/script.storage (UI-created scripts)
                 try:
                     storage_file = file_manager.config_path / '.storage' / 'script.storage'
@@ -1127,7 +1209,22 @@ class HomeAssistantClient:
                             continue
             except Exception:
                 pass
-            
+
+            # Try to find in scripts/*.yaml (for !include_dir_merge_named scripts/)
+            try:
+                scripts_dir = file_manager.config_path / 'scripts'
+                if scripts_dir.exists() and scripts_dir.is_dir():
+                    for yaml_file in scripts_dir.rglob('*.yaml'):
+                        try:
+                            content = yaml_file.read_text(encoding='utf-8')
+                            data = yaml.safe_load(content)
+                            if isinstance(data, dict) and script_id in data:
+                                return data[script_id]
+                        except Exception:
+                            continue
+            except Exception:
+                pass
+
             # Try to find in .storage (UI-created scripts)
             try:
                 storage_file = file_manager.config_path / '.storage' / 'script.storage'
@@ -1306,7 +1403,28 @@ class HomeAssistantClient:
                         continue
         except Exception:
             pass
-        
+
+        # Try scripts/*.yaml (for !include_dir_merge_named scripts/)
+        try:
+            scripts_dir = file_manager.config_path / 'scripts'
+            if scripts_dir.exists() and scripts_dir.is_dir():
+                for yaml_file in scripts_dir.rglob('*.yaml'):
+                    try:
+                        content = yaml_file.read_text(encoding='utf-8')
+                        data = yaml.safe_load(content)
+                        if isinstance(data, dict):
+                            for key, script_config in data.items():
+                                if matches_script(key, script_config, script_id):
+                                    rel_path = yaml_file.relative_to(file_manager.config_path)
+                                    result = {'location': 'scripts_dir', 'file_path': str(rel_path)}
+                                    if isinstance(script_config, dict) and script_config.get('entity_id'):
+                                        result['entity_id'] = script_config.get('entity_id')
+                                    return result
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
         # Try .storage (UI-created)
         try:
             storage_file = file_manager.config_path / '.storage' / 'script.storage'
@@ -1387,7 +1505,16 @@ class HomeAssistantClient:
                         del storage_data['data']['scripts'][script_id]
                 new_content = json.dumps(storage_data, indent=2, ensure_ascii=False)
                 await file_manager.write_file(file_path, new_content, create_backup=True)
-            
+
+            elif location['location'] == 'scripts_dir':
+                # Delete from scripts/*.yaml (named dict format)
+                content = await file_manager.read_file(file_path)
+                data = yaml.safe_load(content) or {}
+                if script_id in data:
+                    del data[script_id]
+                new_content = yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False)
+                await file_manager.write_file(file_path, new_content, create_backup=True)
+
             # Remove from Entity Registry
             # Use actual entity_id from location if found, otherwise construct from script_id
             try:
