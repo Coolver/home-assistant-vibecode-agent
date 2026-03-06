@@ -27,25 +27,21 @@ def _find_log_file() -> Optional[str]:
 
 
 async def _fetch_error_log_api() -> str:
-    """Fetch logs from HA /api/error_log via existing ha_client (uses SUPERVISOR_TOKEN)"""
-    try:
-        # ha_client._request builds the URL as {HA_URL}/api/{endpoint}
-        result = await ha_client._request('GET', 'error_log')
-        # error_log returns plain text, not JSON - ha_client tries response.json()
-        # We need the raw text, so call directly
-        raise Exception("use_raw")
-    except Exception:
-        pass
-
-    # Direct aiohttp call using ha_client's token and url
+    """Fetch logs from HA /api/error_log via SUPERVISOR_TOKEN"""
     import aiohttp
-    token = ha_client.token
-    url = f"{ha_client.url}/api/error_log"
+    import os
+    # SUPERVISOR_TOKEN is set by HA Supervisor for add-ons with hassio_api: true
+    token = os.environ.get('SUPERVISOR_TOKEN') or os.environ.get('HA_TOKEN') or ha_client.token
+    # The error_log endpoint is on the HA Core API, accessible via supervisor proxy
+    url = "http://supervisor/core/api/error_log"
+    logger.info(f"Fetching error_log, token present: {bool(token)}, token length: {len(token) if token else 0}")
     headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+            logger.info(f"error_log response status: {resp.status}")
             if resp.status >= 400:
-                raise Exception(f"HA error_log returned {resp.status}")
+                text = await resp.text()
+                raise Exception(f"HA error_log returned {resp.status}: {text[:200]}")
             return await resp.text()
 
 
