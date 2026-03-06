@@ -1,118 +1,112 @@
-"""Home Assistant System Logs API - reads actual HA log files and error_log endpoint"""
+"""Home Assistant System Logs API - uses Supervisor /host/logs/ and system_log integration"""
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 import logging
 import os
-import aiofiles
+import aiohttp
 from pathlib import Path
-
-from app.services.ha_client import ha_client
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
 
-LOG_PATHS = [
-    '/config/home-assistant.log',
-    '/homeassistant/home-assistant.log',
-    '/usr/share/hassio/homeassistant/home-assistant.log',
-]
+
+def _get_supervisor_token() -> str:
+    """Get SUPERVISOR_TOKEN from environment (set by HA Supervisor for add-ons)"""
+    return os.environ.get('SUPERVISOR_TOKEN', '')
 
 
-def _find_log_file() -> Optional[str]:
-    """Find the actual home-assistant.log file path"""
-    for p in LOG_PATHS:
-        if Path(p).exists():
-            return p
-    return None
+async def _fetch_supervisor_logs(identifier: str = "homeassistant", num_entries: int = 500) -> str:
+    """
+    Fetch logs via Supervisor /host/logs/{identifier}/entries API.
+    This replaces the deprecated /api/error_log endpoint.
+    Requires hassio_api: true and hassio_role: manager in config.yaml.
+    """
+    token = _get_supervisor_token()
+    if not token:
+        raise Exception("SUPERVISOR_TOKEN not available")
 
+    # Use the Supervisor API directly (not via /core proxy)
+    # Range header: entries=:skip:num_entries (negative from end)
+    url = f"http://supervisor/host/logs/{identifier}/entries"
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'text/plain',
+        'Range': f'entries=:-{num_entries}:{num_entries}',
+    }
 
-async def _fetch_error_log_api() -> str:
-    """Fetch logs from HA /api/error_log via SUPERVISOR_TOKEN"""
-    import aiohttp
-    import os
-    # SUPERVISOR_TOKEN is set by HA Supervisor for add-ons with hassio_api: true
-    token = os.environ.get('SUPERVISOR_TOKEN') or os.environ.get('HA_TOKEN') or ha_client.token
-    # The error_log endpoint is on the HA Core API, accessible via supervisor proxy
-    url = "http://supervisor/core/api/error_log"
-    logger.info(f"Fetching error_log, token present: {bool(token)}, token length: {len(token) if token else 0}")
-    headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-            logger.info(f"error_log response status: {resp.status}")
+            logger.info(f"Supervisor logs response: {resp.status} for {identifier}")
+            if resp.status == 404:
+                raise Exception(f"Log identifier '{identifier}' not found (404)")
             if resp.status >= 400:
                 text = await resp.text()
-                raise Exception(f"HA error_log returned {resp.status}: {text[:200]}")
+                raise Exception(f"Supervisor logs API returned {resp.status}: {text[:200]}")
             return await resp.text()
+
+
+async def _fetch_system_log_via_ws() -> list:
+    """
+    Fetch system_log entries via HA WebSocket API (system_log/list).
+    Returns list of log entry dicts.
+    """
+    try:
+        from app.services.websocket_client import ws_client
+        result = await ws_client.call_service_and_get_result(
+            "system_log", "list_entries", {}
+        )
+        return result or []
+    except Exception as e:
+        logger.warning(f"system_log WebSocket fetch failed: {e}")
+        return []
 
 
 @router.get("/ha_system")
 async def get_ha_system_logs(
-    tail: int = Query(200, description="Number of lines to return from end of log", ge=1, le=5000),
-    filter: Optional[str] = Query(None, description="Filter string (case-insensitive). E.g. 'zendure', 'ERROR', 'WARNING'"),
-    level: Optional[str] = Query(None, description="Filter by log level: ERROR, WARNING, INFO, DEBUG"),
-    use_api: bool = Query(True, description="Try HA /api/error_log first (recommended). Falls back to file read."),
+    tail: int = Query(200, description="Number of lines to return", ge=1, le=5000),
+    filter: Optional[str] = Query(None, description="Filter string (case-insensitive)"),
+    level: Optional[str] = Query(None, description="Filter by level: ERROR, WARNING, INFO, DEBUG"),
+    identifier: str = Query("homeassistant", description="Log identifier: homeassistant, supervisor, core, etc."),
 ):
     """
-    Get actual Home Assistant system logs (home-assistant.log).
+    Get actual Home Assistant system logs via Supervisor /host/logs/ API.
 
-    Unlike /api/logs which returns only agent-internal logs, this endpoint reads the
-    real HA log file or uses the Supervisor API to fetch system-wide log entries.
-
-    **Parameters:**
-    - `tail`: Number of lines to return (default 200, max 5000)
-    - `filter`: Optional substring filter (case-insensitive). E.g. 'zendure', 'custom_components'
-    - `level`: Filter by log level (ERROR, WARNING, INFO, DEBUG)
-    - `use_api`: Use HA /api/error_log endpoint (default true). Falls back to direct file read.
+    Uses the Supervisor API (requires hassio_api: true, hassio_role: manager).
+    Falls back to system_log integration entries if Supervisor API fails.
 
     **Examples:**
     - `/api/ha_logs/ha_system?tail=100&filter=zendure` - Last 100 Zendure log lines
     - `/api/ha_logs/ha_system?level=ERROR` - Only errors
-    - `/api/ha_logs/ha_system?filter=custom_components.zendure_ha&tail=50` - Zendure integration logs
+    - `/api/ha_logs/ha_system?identifier=supervisor` - Supervisor logs
     """
     raw_content = None
     source = None
 
-    # Try Supervisor API first
-    if use_api and SUPERVISOR_TOKEN:
+    # Try Supervisor /host/logs/ API first
+    token = _get_supervisor_token()
+    if token:
         try:
-            raw_content = await _fetch_error_log_api()
-            source = "supervisor_api"
-            logger.info(f"Fetched HA system logs via Supervisor API ({len(raw_content)} bytes)")
+            raw_content = await _fetch_supervisor_logs(identifier=identifier, num_entries=min(tail * 3, 2000))
+            source = f"supervisor_host_logs:{identifier}"
+            logger.info(f"Fetched logs via Supervisor API ({len(raw_content)} bytes)")
         except Exception as e:
-            logger.warning(f"Supervisor API log fetch failed: {e}, falling back to file")
+            logger.warning(f"Supervisor logs API failed: {e}")
 
-    # Fallback: read file directly
     if raw_content is None:
-        log_path = _find_log_file()
-        if log_path:
-            try:
-                async with aiofiles.open(log_path, 'r', encoding='utf-8', errors='replace') as f:
-                    raw_content = await f.read()
-                source = f"file:{log_path}"
-                logger.info(f"Read HA system log from {log_path} ({len(raw_content)} bytes)")
-            except Exception as e:
-                logger.error(f"Failed to read log file {log_path}: {e}")
-                raise HTTPException(status_code=500, detail=f"Failed to read log file: {e}")
-        else:
-            raise HTTPException(
-                status_code=404,
-                detail="home-assistant.log not found. Checked: " + ", ".join(LOG_PATHS)
-            )
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not fetch logs. Token present: {bool(token)}. "
+                   f"Requires hassio_api: true and hassio_role: manager in config.yaml."
+        )
 
-    # Split into lines
     lines = raw_content.splitlines()
 
-    # Apply level filter
     if level:
-        level_upper = level.upper()
-        lines = [l for l in lines if level_upper in l]
+        lines = [l for l in lines if level.upper() in l.upper()]
 
-    # Apply text filter
     if filter:
-        filter_lower = filter.lower()
-        lines = [l for l in lines if filter_lower in l.lower()]
+        lines = [l for l in lines if filter.lower() in l.lower()]
 
-    # Apply tail
     lines = lines[-tail:]
 
     return {
@@ -122,6 +116,7 @@ async def get_ha_system_logs(
         "filter_applied": filter,
         "level_filter": level,
         "tail": tail,
+        "identifier": identifier,
         "lines": lines,
         "raw": "\n".join(lines),
     }
@@ -133,51 +128,41 @@ async def get_zendure_logs(
     level: Optional[str] = Query(None, description="Filter by level: ERROR, WARNING, INFO, DEBUG"),
 ):
     """
-    Get Zendure integration logs from home-assistant.log.
+    Get Zendure integration logs from Home Assistant system logs.
 
-    Convenience shortcut that filters for 'zendure' or 'custom_components.zendure_ha'
-    entries in the HA system log.
+    Fetches HA logs via Supervisor API and filters for Zendure-related entries.
 
     **Examples:**
-    - `/api/ha_logs/ha_system/zendure` - Last 100 Zendure log lines
+    - `/api/ha_logs/ha_system/zendure` - Last 100 Zendure lines
     - `/api/ha_logs/ha_system/zendure?level=ERROR` - Only Zendure errors
-    - `/api/ha_logs/ha_system/zendure?tail=50` - Last 50 Zendure lines
     """
+    token = _get_supervisor_token()
     raw_content = None
 
-    if SUPERVISOR_TOKEN:
+    if token:
         try:
-            raw_content = await _fetch_error_log_api()
+            raw_content = await _fetch_supervisor_logs(identifier="homeassistant", num_entries=2000)
         except Exception as e:
-            logger.warning(f"Supervisor API failed: {e}")
+            logger.warning(f"Supervisor logs failed for zendure endpoint: {e}")
 
     if raw_content is None:
-        log_path = _find_log_file()
-        if log_path:
-            try:
-                async with aiofiles.open(log_path, 'r', encoding='utf-8', errors='replace') as f:
-                    raw_content = await f.read()
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Failed to read log: {e}")
-        else:
-            raise HTTPException(status_code=404, detail="home-assistant.log not found")
+        raise HTTPException(
+            status_code=503,
+            detail=f"home-assistant.log not found. Token present: {bool(token)}. "
+                   f"Requires hassio_api: true and hassio_role: manager in config.yaml."
+        )
 
     lines = raw_content.splitlines()
-
-    # Filter for zendure
     zendure_lines = [l for l in lines if 'zendure' in l.lower()]
 
-    # Level filter
     if level:
-        level_upper = level.upper()
-        zendure_lines = [l for l in zendure_lines if level_upper in l]
+        zendure_lines = [l for l in zendure_lines if level.upper() in l.upper()]
 
     zendure_lines = zendure_lines[-tail:]
 
-    # Parse structured summary
     errors = [l for l in zendure_lines if 'ERROR' in l]
     warnings = [l for l in zendure_lines if 'WARNING' in l]
-    p1_events = [l for l in zendure_lines if 'p1' in l.lower() or 'powerchanged' in l.lower() or 'P1 ======>' in l]
+    p1_events = [l for l in zendure_lines if 'p1' in l.lower() or 'powerchanged' in l.lower()]
 
     return {
         "success": True,

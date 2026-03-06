@@ -260,9 +260,10 @@ async def get_zendure_diagnostics():
     Ideal for the Cursor agent to get a complete picture in a single request.
     """
     import aiohttp
+    import os
 
     HA_URL = ha_client.url
-    TOKEN = ha_client.token
+    SUPERVISOR_TOKEN = os.environ.get('SUPERVISOR_TOKEN', '')
 
     # Get devices and status in parallel
     try:
@@ -327,12 +328,16 @@ async def get_zendure_diagnostics():
     # --- Log tail ---
     log_lines = []
     log_source = "unavailable"
-    if TOKEN:
+    if SUPERVISOR_TOKEN:
         try:
-            headers = {"Authorization": f"Bearer {TOKEN}"}
+            headers = {
+                "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+                "Accept": "text/plain",
+                "Range": "entries=:-2000:2000",
+            }
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    f"{HA_URL}/api/error_log",
+                    "http://supervisor/host/logs/homeassistant/entries",
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=15),
                 ) as resp:
@@ -340,7 +345,9 @@ async def get_zendure_diagnostics():
                         text = await resp.text()
                         all_lines = text.splitlines()
                         log_lines = [l for l in all_lines if "zendure" in l.lower()][-50:]
-                        log_source = "supervisor_api"
+                        log_source = "supervisor_host_logs"
+                    else:
+                        logger.warning(f"Supervisor host/logs returned {resp.status}")
         except Exception as e:
             logger.warning(f"Could not fetch logs for diagnostics: {e}")
 
