@@ -260,10 +260,9 @@ async def get_zendure_diagnostics():
     Ideal for the Cursor agent to get a complete picture in a single request.
     """
     import aiohttp
-    import os
 
-    HA_URL = os.getenv('HA_URL', 'http://supervisor/core')
-    SUPERVISOR_TOKEN = os.getenv('SUPERVISOR_TOKEN', '')
+    HA_URL = ha_client.url
+    TOKEN = ha_client.token
 
     # Get devices and status in parallel
     try:
@@ -328,9 +327,9 @@ async def get_zendure_diagnostics():
     # --- Log tail ---
     log_lines = []
     log_source = "unavailable"
-    if SUPERVISOR_TOKEN:
+    if TOKEN:
         try:
-            headers = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
+            headers = {"Authorization": f"Bearer {TOKEN}"}
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{HA_URL}/api/error_log",

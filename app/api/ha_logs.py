@@ -3,15 +3,13 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 import logging
 import os
-import aiohttp
 import aiofiles
 from pathlib import Path
 
+from app.services.ha_client import ha_client
+
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
-
-HA_URL = os.getenv('HA_URL', 'http://supervisor/core')
-SUPERVISOR_TOKEN = os.getenv('SUPERVISOR_TOKEN', '')
 
 LOG_PATHS = [
     '/config/home-assistant.log',
@@ -29,20 +27,25 @@ def _find_log_file() -> Optional[str]:
 
 
 async def _fetch_error_log_api() -> str:
-    """Fetch logs from HA /api/error_log endpoint via Supervisor token"""
-    token = os.getenv('SUPERVISOR_TOKEN', '') or SUPERVISOR_TOKEN
-    if not token:
-        raise Exception("No SUPERVISOR_TOKEN available")
-    ha_url = os.getenv('HA_URL', HA_URL)
-    headers = {
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/json',
-    }
-    url = f"{ha_url}/api/error_log"
+    """Fetch logs from HA /api/error_log via existing ha_client (uses SUPERVISOR_TOKEN)"""
+    try:
+        # ha_client._request builds the URL as {HA_URL}/api/{endpoint}
+        result = await ha_client._request('GET', 'error_log')
+        # error_log returns plain text, not JSON - ha_client tries response.json()
+        # We need the raw text, so call directly
+        raise Exception("use_raw")
+    except Exception:
+        pass
+
+    # Direct aiohttp call using ha_client's token and url
+    import aiohttp
+    token = ha_client.token
+    url = f"{ha_client.url}/api/error_log"
+    headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
             if resp.status >= 400:
-                raise Exception(f"HA API error_log returned {resp.status}")
+                raise Exception(f"HA error_log returned {resp.status}")
             return await resp.text()
 
 
