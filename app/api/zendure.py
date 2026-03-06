@@ -262,10 +262,59 @@ async def get_zendure_diagnostics():
     import aiohttp
     import os
 
-    HA_URL = ha_client.url
     SUPERVISOR_TOKEN = os.environ.get('SUPERVISOR_TOKEN', '')
 
-    # Get devices and status in parallel
+    # --- Log tail ---
+    log_lines = []
+    log_source = "unavailable"
+
+    # Try Supervisor host logs
+    if SUPERVISOR_TOKEN:
+        try:
+            headers = {
+                "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+                "Accept": "text/plain",
+                "Range": "entries=:-2000:2000",
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "http://supervisor/host/logs/homeassistant/entries",
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=15),
+                ) as resp:
+                    if resp.status == 200:
+                        text = await resp.text()
+                        all_lines = text.splitlines()
+                        log_lines = [l for l in all_lines if "zendure" in l.lower()][-50:]
+                        log_source = "supervisor_host_logs"
+                    else:
+                        logger.warning(f"Supervisor host/logs returned {resp.status}")
+        except Exception as e:
+            logger.warning(f"Could not fetch logs for diagnostics: {e}")
+
+    # Fallback: WebSocket system_log/list
+    if not log_lines:
+        try:
+            from app.services.ha_websocket import get_ws_client
+            ws = await get_ws_client()
+            entries = await ws._send_message({'type': 'system_log/list'}, timeout=15.0)
+            if isinstance(entries, list):
+                for e in entries:
+                    name = e.get('name', '')
+                    messages = e.get('message', [])
+                    msg = ' | '.join(messages) if isinstance(messages, list) else str(messages)
+                    if 'zendure' in name.lower() or 'zendure' in msg.lower():
+                        ts = e.get('timestamp', '')
+                        level = e.get('level', 'unknown').upper()
+                        count = e.get('count', 1)
+                        suffix = f" (x{count})" if count > 1 else ""
+                        log_lines.append(f"{ts} {level} {name} {msg}{suffix}")
+                if log_lines:
+                    log_source = "websocket_system_log"
+        except Exception as e:
+            logger.warning(f"WebSocket system_log fetch failed in diagnostics: {e}")
+
+    # Get devices and status
     try:
         all_states = await ha_client.get_states()
     except Exception as e:
@@ -324,32 +373,6 @@ async def get_zendure_diagnostics():
         for s in all_states
         if "zendure_manager" in s["entity_id"]
     }
-
-    # --- Log tail ---
-    log_lines = []
-    log_source = "unavailable"
-    if SUPERVISOR_TOKEN:
-        try:
-            headers = {
-                "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
-                "Accept": "text/plain",
-                "Range": "entries=:-2000:2000",
-            }
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    "http://supervisor/host/logs/homeassistant/entries",
-                    headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=15),
-                ) as resp:
-                    if resp.status == 200:
-                        text = await resp.text()
-                        all_lines = text.splitlines()
-                        log_lines = [l for l in all_lines if "zendure" in l.lower()][-50:]
-                        log_source = "supervisor_host_logs"
-                    else:
-                        logger.warning(f"Supervisor host/logs returned {resp.status}")
-        except Exception as e:
-            logger.warning(f"Could not fetch logs for diagnostics: {e}")
 
     errors = [l for l in log_lines if "ERROR" in l]
     warnings = [l for l in log_lines if "WARNING" in l]
