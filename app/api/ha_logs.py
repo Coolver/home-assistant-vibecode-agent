@@ -30,13 +30,15 @@ def _find_log_file() -> Optional[str]:
 
 async def _fetch_error_log_api() -> str:
     """Fetch logs from HA /api/error_log endpoint via Supervisor token"""
-    if not SUPERVISOR_TOKEN:
+    token = os.getenv('SUPERVISOR_TOKEN', '') or SUPERVISOR_TOKEN
+    if not token:
         raise Exception("No SUPERVISOR_TOKEN available")
+    ha_url = os.getenv('HA_URL', HA_URL)
     headers = {
-        'Authorization': f'Bearer {SUPERVISOR_TOKEN}',
+        'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json',
     }
-    url = f"{HA_URL}/api/error_log"
+    url = f"{ha_url}/api/error_log"
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
             if resp.status >= 400:
