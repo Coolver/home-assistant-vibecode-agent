@@ -46,7 +46,7 @@ def _extract_device_prefix(entity_id: str) -> Optional[str]:
 
 
 @router.get("/devices")
-async def get_zendure_devices():
+async def get_zendure_devices(all_states: Optional[List[Dict]] = None):
     """
     Get all Zendure devices and their aggregated energy data.
 
@@ -57,10 +57,11 @@ async def get_zendure_devices():
     - List of devices with available_kwh, total_kwh, soc, solar_input_power, etc.
     - Fleet summary: total capacity, available energy, overall SoC, total solar/output power
     """
-    try:
-        all_states = await ha_client.get_states()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch HA states: {e}")
+    if all_states is None:
+        try:
+            all_states = await ha_client.get_states()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch HA states: {e}")
 
     # Find all Zendure-related sensors
     zendure_states = [
@@ -176,7 +177,7 @@ async def get_zendure_devices():
 
 
 @router.get("/status")
-async def get_zendure_status():
+async def get_zendure_status(all_states: Optional[List[Dict]] = None):
     """
     Quick Zendure fleet status snapshot.
 
@@ -186,10 +187,11 @@ async def get_zendure_status():
     - Manager entity states (Zendure Manager Power, Operation State, etc.)
     - Any entities in unknown/unavailable state (for debugging)
     """
-    try:
-        all_states = await ha_client.get_states()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch HA states: {e}")
+    if all_states is None:
+        try:
+            all_states = await ha_client.get_states()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch HA states: {e}")
 
     # Collect all zendure entities
     zendure_entities = [
@@ -211,7 +213,6 @@ async def get_zendure_status():
         "sensor.gesamt_solarleistung",
         "sensor.gesamt_output_home_power",
         "sensor.netz_leistung_gesamt_w",
-        "sensor.zendure_log_tail",
     ]
 
     template_sensors = {}
@@ -256,13 +257,19 @@ async def get_zendure_diagnostics():
     """
     Full Zendure diagnostics — device data + log tail + status in one call.
 
-    Directly reuses get_zendure_devices() and get_zendure_status() to avoid
-    duplication and ensure consistent data (including solar/output values).
+    Fetches HA states exactly once and passes them to sub-functions to avoid
+    redundant API calls. Combines /zendure/devices + /zendure/status + logs.
     """
     import os
 
-    # --- Devices + Fleet (reuse /devices logic fully) ---
-    devices_result = await get_zendure_devices()
+    # --- Single get_states() call shared across all sub-functions ---
+    try:
+        all_states = await ha_client.get_states()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch HA states: {e}")
+
+    # --- Devices + Fleet (pass shared states to avoid 2nd API call) ---
+    devices_result = await get_zendure_devices(all_states=all_states)
     device_summary = [
         {
             "device_id": dev["device_id"],
@@ -281,8 +288,8 @@ async def get_zendure_diagnostics():
     fleet_total = fleet.get("total_capacity_kwh", 0.0)
     fleet_soc = fleet.get("soc_pct", 0.0)
 
-    # --- Manager entities (reuse /status) ---
-    status_result = await get_zendure_status()
+    # --- Manager entities (pass shared states to avoid 3rd API call) ---
+    status_result = await get_zendure_status(all_states=all_states)
     manager_states = {
         e["entity_id"]: e["state"]
         for e in status_result.get("manager_entities", [])
@@ -355,4 +362,136 @@ async def get_zendure_diagnostics():
             "recent_warnings": warnings[-5:],
             "recent_lines": log_lines[-20:],
         },
+    }
+
+
+@router.get("/socfull_alert")
+async def get_socfull_alert():
+    """
+    Detect the 'SoC=100% + Bypass Forbidden + Output cycling to 0W' bug (Issue #1151).
+
+    This is a known bug in Zendure-HA manager.py where once a device reaches 100% SoC
+    and bypass is forbidden, the power output cycles between 0 and the setpoint instead
+    of holding steady. The root cause is in the discharge_bypass calculation in
+    powerChanged(): when state==SOCFULL, pwr_produced is subtracted from setpoint,
+    which can flip the sign and incorrectly trigger charge logic.
+
+    **What this endpoint detects:**
+    - Devices at or above socSet (100% or configured max SoC)
+    - Low/zero output despite active solar input (indicating the cycling bug)
+    - Manager in MATCHING mode (smart/auto) where the bug occurs
+
+    **Returns:**
+    - alert: bool — True if the issue is likely active
+    - affected_devices: list of devices showing the symptom
+    - recommendation: string with the suggested action
+    - workaround_active: bool — True if a manual power override is currently set
+
+    **Community note (GitHub Issue #1151):**
+    Workaround until upstream fix: Switch to MANUAL mode with a fixed output_limit,
+    or use 'store_solar' mode. The CT/App workaround (running Zendure CT mode in the
+    app alongside the integration) also suppresses the symptom.
+    """
+    try:
+        all_states = await ha_client.get_states()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch HA states: {e}")
+
+    state_map = {s["entity_id"]: s for s in all_states}
+
+    def _get(entity_id: str) -> Optional[float]:
+        s = state_map.get(entity_id)
+        if s and s["state"] not in ("unknown", "unavailable", None):
+            return _safe_float(s["state"])
+        return None
+
+    # Get manager operation mode
+    manager_op = None
+    for s in all_states:
+        if "zendure_manager" in s["entity_id"] and "operation" in s["entity_id"] and s["entity_id"].startswith("select."):
+            manager_op = s["state"]
+            break
+
+    manager_manual_power = _get("number.zendure_manager_manual_power")
+
+    # Find all device prefixes from known sensors
+    device_prefixes: set = set()
+    for s in all_states:
+        prefix = _extract_device_prefix(s["entity_id"])
+        if prefix and prefix not in ("gesamt", "zendure_manager"):
+            device_prefixes.add(prefix)
+
+    affected_devices = []
+    all_full_devices = []
+
+    for prefix in sorted(device_prefixes):
+        soc = _get(f"sensor.{prefix}_electric_level")
+        soc_set = _get(f"sensor.{prefix}_soc_set") or _get(f"number.{prefix}_soc_set") or 100.0
+        solar_w = _get(f"sensor.{prefix}_solar_input_power")
+        output_w = _get(f"sensor.{prefix}_output_home_power")
+        pack_input_w = _get(f"sensor.{prefix}_pack_input_power")
+
+        if soc is None:
+            continue
+
+        is_full = soc >= (soc_set - 2)  # 2% tolerance
+
+        if is_full:
+            all_full_devices.append(prefix)
+
+        # Bug symptom: device is full, has solar input, but output is near zero
+        # while manager is in smart mode (not manual, not off)
+        if (
+            is_full
+            and solar_w is not None and solar_w > 20
+            and output_w is not None and output_w < 30
+            and manager_op in ("smart", "smart_charging", "smart_discharging", "store_solar")
+        ):
+            affected_devices.append({
+                "device_id": prefix,
+                "soc_pct": soc,
+                "soc_set": soc_set,
+                "solar_input_w": solar_w,
+                "output_home_w": output_w,
+                "pack_input_w": pack_input_w,
+                "symptom": "SoC=100%, solar active, output near 0W — likely cycling bug",
+            })
+
+    alert = len(affected_devices) > 0
+    workaround_active = manager_op == "manual" or (manager_manual_power is not None and manager_manual_power != 0)
+
+    if alert:
+        recommendation = (
+            "Issue #1151 detected. Workarounds (until upstream fix in Zendure-HA):\n"
+            "1. Switch manager to 'manual' mode with a fixed output limit (e.g. 300W) — "
+            "requires an automation to track home consumption.\n"
+            "2. Switch to 'store_solar' mode — reduces output cycling but may not fully eliminate it.\n"
+            "3. Enable CT mode on one device via the Zendure app (community workaround).\n"
+            "Upstream fix needed in manager.py powerChanged(): discharge_bypass logic "
+            "incorrectly flips setpoint sign for SOCFULL devices with no bypass."
+        )
+    elif all_full_devices:
+        recommendation = (
+            f"Devices at full SoC: {', '.join(all_full_devices)}. "
+            "No active output cycling detected currently, but monitor for Issue #1151 symptoms "
+            "if solar input increases and output drops to 0W."
+        )
+    else:
+        recommendation = "No devices at full SoC. Issue #1151 not applicable right now."
+
+    return {
+        "success": True,
+        "alert": alert,
+        "manager_operation": manager_op,
+        "workaround_active": workaround_active,
+        "devices_at_full_soc": all_full_devices,
+        "affected_devices": affected_devices,
+        "recommendation": recommendation,
+        "issue_reference": "https://github.com/Zendure/Zendure-HA/issues/1151",
+        "root_cause": (
+            "manager.py powerChanged(): when state==SOCFULL, discharge_bypass subtracts "
+            "pwr_produced from setpoint (line ~425). If pwr_produced is small or zero, "
+            "this can flip setpoint negative, triggering charge logic instead of discharge, "
+            "causing output to cycle to 0W."
+        ),
     }
