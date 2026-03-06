@@ -1,6 +1,5 @@
 {
-  "name": "HA Vibecode Agent Repository",
-  "url": "https://github.com/Coolver/home-assistant-vibecode-agent",
-  "maintainer": "Coolver <boxstartup@gmail.com>"
+  "name": "Swissky HA Vibecode Agent",
+  "url": "https://github.com/swissky/ha-vibecode-agent",
+  "maintainer": "swissky"
 }
-

@@ -23,6 +23,20 @@ bashio::log.info "Starting HA Cursor Agent on port ${PORT}..."
 bashio::log.info "Log level: ${LOG_LEVEL}"
 bashio::log.info "Git versioning auto: ${GIT_VERSIONING_AUTO}"
 
+# Apply config-based patches if present (enables hot-patching without image rebuild)
+PATCH_DIR="/config/.addon_patches"
+if [ -d "${PATCH_DIR}" ]; then
+  bashio::log.info "Applying patches from ${PATCH_DIR}..."
+  for src in "${PATCH_DIR}"/*.py; do
+    rel="${src#${PATCH_DIR}/}"
+    dest="/app/${rel//__/\/}"
+    dest_dir=$(dirname "$dest")
+    mkdir -p "$dest_dir"
+    cp "$src" "$dest"
+    bashio::log.info "Patched: $dest"
+  done
+fi
+
 # Start FastAPI application
 exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port "${PORT}" --log-level "${LOG_LEVEL}"
 
