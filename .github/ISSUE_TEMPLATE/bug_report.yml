@@ -1,5 +1,5 @@
 name: 🐛 Bug Report
-description: Report a bug or issue with the HA Cursor Agent
+description: Report a bug or issue with the HA Vibecode Agent
 title: "[Bug]: "
 labels: ["bug"]
 body:
@@ -64,7 +64,7 @@ body:
     id: logs
     attributes:
       label: Add-on Logs
-      description: Paste relevant logs from the add-on (Settings → Add-ons → HA Cursor Agent → Log)
+      description: Paste relevant logs from the add-on (Settings → Add-ons → HA Vibecode Agent → Log)
       placeholder: |
         ⚠️ IMPORTANT: Redact tokens, API keys, passwords, and IP addresses!
       render: shell

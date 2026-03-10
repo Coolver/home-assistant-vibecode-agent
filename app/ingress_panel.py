@@ -1,5 +1,5 @@
 """
-Ingress Panel for HA Cursor Agent
+Ingress Panel for HA Vibecode Agent
 Renders configuration panel using Jinja2 template
 """
 from pathlib import Path

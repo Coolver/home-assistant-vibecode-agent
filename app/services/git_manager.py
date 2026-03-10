@@ -497,7 +497,7 @@ secrets.yaml
             
             # Create commit message
             if not message:
-                message = f"Auto-commit by HA Cursor Agent at {datetime.now().isoformat()}"
+                message = f"Auto-commit by HA Vibecode Agent at {datetime.now().isoformat()}"
             
             # Commit
             commit = self.repo.index.commit(message)

@@ -1,2 +1,2 @@
-"""HA Cursor Agent Application"""
+"""HA Vibecode Agent Application"""
 

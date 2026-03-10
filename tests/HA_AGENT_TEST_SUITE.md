@@ -1,7 +1,7 @@
 # 🧪 Home Assistant Agent - Comprehensive Test Suite
 
-**Version:** 2.10.39  
-**Purpose:** Complete testing of all HA Cursor Agent MCP functions  
+**Version:** 2.10.40  
+**Purpose:** Complete testing of all HA Vibecode Agent MCP functions  
 **Usage:** Say "run Home Assistant Agent test suite" to run full suite
 
 ---
@@ -452,7 +452,7 @@
 **Function:** `ha_list_installed_addons`  
 **Parameters:** `{}`  
 **Expected:** Currently installed add-ons  
-**Success:** Returns array (includes HA Cursor Agent)
+**Success:** Returns array (includes HA Vibecode Agent)
 
 ### test_get_addon_info
 **Function:** `ha_addon_info`  
@@ -943,7 +943,7 @@ Track these metrics during test execution:
 
 ### Prerequisites
 - Home Assistant running
-- HA Cursor Agent installed and running
+- HA Vibecode Agent installed and running
 - MCP server connected
 - Git initialized in /config
 - Test mode recommended (not production)
@@ -1140,5 +1140,5 @@ HA_AGENT_KEY=<your-token>
 
 **Last Updated:** 2026-01-27  
 **Test Suite Version:** 1.2.0  
-**Compatible with:** HA Cursor Agent v2.10.39+
+**Compatible with:** HA Vibecode Agent v2.10.40+
 

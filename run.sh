@@ -19,7 +19,7 @@ export HA_TOKEN="${HA_TOKEN}"
 export HA_URL="${HA_URL}"
 export CONFIG_PATH="/config"
 
-bashio::log.info "Starting HA Cursor Agent on port ${PORT}..."
+bashio::log.info "Starting HA Vibecode Agent on port ${PORT}..."
 bashio::log.info "Log level: ${LOG_LEVEL}"
 bashio::log.info "Git versioning auto: ${GIT_VERSIONING_AUTO}"
 

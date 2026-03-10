@@ -1,4 +1,4 @@
-# HA CURSOR AGENT - INSTRUCTIONS FOR AI ASSISTANTS
+# HA VIBECODE AGENT - INSTRUCTIONS FOR AI ASSISTANTS
 
 **Version:** 2.6.1  
 **Base URL:** http://homeassistant.local:8099  
@@ -8,7 +8,7 @@
 
 ## About This Guide
 
-This guide provides comprehensive instructions for AI assistants (like Cursor AI) on how to safely and effectively interact with Home Assistant through the HA Cursor Agent.
+This guide provides comprehensive instructions for AI assistants (like Cursor AI) on how to safely and effectively interact with Home Assistant through the HA Vibecode Agent.
 
 **Key Principles:**
 - 🛡️ **Safety First** - Always analyze before modifying

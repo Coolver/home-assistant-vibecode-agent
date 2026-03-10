@@ -2,7 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.10.39] - 2026-02-18
+## [2.10.40] - 2026-03-10
+
+### ✨ Voice assistant exposure controls + split-directory config support (release prepared by @wilsto)
+
+- **Release prepared by:** [@wilsto](https://github.com/wilsto). Huge thanks for driving these improvements and aligning them with real-world HA power-user setups.
+- **Control which entities are exposed to voice assistants:** New endpoints in `entities` and WebSocket helpers let you list and bulk update which entities are exposed to Assist/Ollama, Alexa, or Google Assistant:
+  - `GET /api/entities/exposed?assistant=conversation` — list entities exposed to a given assistant.
+  - `POST /api/entities/expose` — expose/unexpose multiple entities in one call (supports `conversation`, `cloud.alexa`, and `cloud.google_assistant`).
+  - Backed by HA WebSocket commands `homeassistant/expose_entity` and `homeassistant/expose_entity/list`, so changes apply immediately without restart.
+- **Support split-directory configs for automations and scripts:** The agent now understands configurations organized in `automations/` and `scripts/` directories (common `!include_dir_merge_list` / `!include_dir_merge_named` patterns):
+  - `list_automations`, `get_automation`, `_find_automation_location`, and `delete_automation` now scan `automations/*.yaml` alongside `automations.yaml`, `packages/*.yaml`, and `.storage`.
+  - `list_scripts`, `get_script`, `_find_script_location`, and `delete_script` now scan `scripts/*.yaml` in addition to `scripts.yaml`, `packages/*.yaml`, and `.storage`.
+  - A dedicated test suite (`tests/test_split_dir_support.py`) covers list/get/find/delete behaviour, missing directories, and malformed YAML files.
+- **Backwards-compatible:** Existing setups that only use `automations.yaml` / `scripts.yaml` / `packages` / `.storage` keep working unchanged; split-directory support is additive.
+
+## [2.10.39] - 2026-02-19
 
 ### 🔧 Allow YAML files with Home Assistant custom tags in `ha_write_file` (reported by @ghzgod)
 
