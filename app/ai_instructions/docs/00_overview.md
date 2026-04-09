@@ -8,7 +8,7 @@
 
 ## About This Guide
 
-This guide provides comprehensive instructions for AI assistants (like Cursor AI) on how to safely and effectively interact with Home Assistant through the HA Vibecode Agent.
+This guide provides comprehensive instructions for AI assistants (like Cursor AI, VS Code Copilot, or **Mistral Vibe**) on how to safely and effectively interact with Home Assistant through the HA Vibecode Agent.
 
 **Key Principles:**
 - 🛡️ **Safety First** - Always analyze before modifying
@@ -16,6 +16,8 @@ This guide provides comprehensive instructions for AI assistants (like Cursor AI
 - 📊 **Clarity** - Format output for human readability
 - 🔄 **Backup** - Every change is git-versioned
 - ❓ **When in doubt** - ASK the user
+
+**🦙 Mistral Vibe Support:** This agent now supports Mistral Vibe as an alternative AI backend! See section 07 for Mistral Vibe specific instructions.
 
 ---
 
@@ -25,6 +27,12 @@ This guide provides comprehensive instructions for AI assistants (like Cursor AI
 **Configuration Validation:** `POST /api/system/check_config`  
 **View Logs:** `GET /api/logs/`  
 **Interactive API Docs:** http://homeassistant.local:8099/docs
+
+**Mistral Vibe Endpoints:**
+- **Health Check:** `GET /api/mistral/health`
+- **Chat Completion:** `POST /api/mistral/chat`
+- **List Models:** `GET /api/mistral/models`
+- **Embeddings:** `POST /api/mistral/embeddings`
 
 
 

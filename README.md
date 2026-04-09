@@ -213,7 +213,27 @@ You'll see this interface:
   <img src=".github/images/ingress-panel.jpg" alt="HA Vibecode Agent Ingress Panel" width="700">
 </p>
 
-7. Click the **Cursor** or **VS Code** tab (depending on which IDE you want to use with Home Assistant) and **follow the setup instructions**. You’ll need to install and configure Cursor or VS Code so they can connect to the HA Agent via the MCP protocol.
+### 3. (Optional) Configure Mistral Vibe
+
+**New!** You can now use Mistral Vibe as an alternative AI backend:
+
+1. Click **"Open Web UI"** button
+2. Go to the **Configuration** tab
+3. Set these Mistral Vibe options:
+   - `mistral_vibe_api_url`: Your Mistral Vibe API endpoint (e.g., `https://api.mistral.ai/v1`)
+   - `mistral_vibe_api_key`: Your Mistral Vibe API key
+   - `mistral_vibe_default_model`: Default model (e.g., `mistral-tiny`)
+4. Click **SAVE** and restart the add-on
+
+**Environment Variables Alternative:**
+You can also configure Mistral Vibe using environment variables:
+```bash
+MISTRAL_VIBE_API_URL="https://api.mistral.ai/v1"
+MISTRAL_VIBE_API_KEY="your-api-key-here"
+MISTRAL_VIBE_DEFAULT_MODEL="mistral-tiny"
+```
+
+7. Click the **Cursor**, **VS Code**, or **Mistral Vibe** tab (depending on which AI you want to use with Home Assistant) and **follow the setup instructions**. You’ll need to install and configure your IDE so it can connect to the HA Agent.
 
 8. That’s it — **you’re ready to start** working with your Home Assistant scripts, automations and dashboards using AI.
 If you find this project useful and want to support its development, **please consider giving it a [GitHub Star](https://github.com/Coolver/home-assistant-vibecode-agent) ⭐**
@@ -222,9 +242,11 @@ If you find this project useful and want to support its development, **please co
 
 ---
 
-## 🤖 Using with AI IDE (Cursor, VS Code etc)
+## 🤖 Using with AI IDE (Cursor, VS Code, Mistral Vibe etc)
 
 This add-on enables **AI IDE to autonomously manage your Home Assistant** through natural language - no manual copy-pasting needed!
+
+**🦙 Mistral Vibe Support:** You can now use Mistral Vibe as an alternative or complementary AI backend! The agent provides direct API access to Mistral Vibe's powerful language models for generating automations, analyzing your setup, and creating intelligent home solutions.
 
 ### ⚠️ Important Disclaimer
 
@@ -317,6 +339,14 @@ For complete API documentation, authentication details, and usage examples, see 
 **Quick access:**
 - **Swagger UI:** `http://homeassistant.local:8099/docs` (when installed)
 - **ReDoc:** `http://homeassistant.local:8099/redoc` (when installed)
+
+**🦙 Mistral Vibe API Endpoints:**
+- **Health Check:** `GET /api/mistral/health` - Check Mistral Vibe connectivity
+- **Chat Completion:** `POST /api/mistral/chat` - Generate responses using Mistral models
+- **List Models:** `GET /api/mistral/models` - Get available Mistral models
+- **Embeddings:** `POST /api/mistral/embeddings` - Create text embeddings
+
+See the full API documentation for detailed usage examples and authentication requirements.
 
 ---
 

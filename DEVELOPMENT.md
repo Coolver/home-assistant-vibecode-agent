@@ -154,6 +154,40 @@ Once the agent is running, access interactive API documentation:
 
 #### Files API (`/api/files`)
 
+#### Mistral Vibe API (`/api/mistral`)  
+**New!** Direct integration with Mistral Vibe language models
+
+```bash
+# Health check
+GET /api/mistral/health
+
+# Chat completion
+POST /api/mistral/chat
+{
+  "messages": [
+    {"role": "user", "content": "Create a Home Assistant automation for motion detection"}
+  ],
+  "model": "mistral-small",
+  "temperature": 0.7
+}
+
+# List available models
+GET /api/mistral/models
+
+# Create embeddings
+POST /api/mistral/embeddings
+{
+  "input": "Smart home automation",
+  "model": "mistral-embed"
+}
+```
+
+**Authentication:** All Mistral Vibe endpoints require the same API key authentication as other endpoints.
+
+**Configuration:** Set `MISTRAL_VIBE_API_URL` and `MISTRAL_VIBE_API_KEY` environment variables to enable.
+
+#### Files API (`/api/files`)
+
 Manage configuration files in the Home Assistant `/config` directory.
 
 ```bash

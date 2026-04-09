@@ -1,12 +1,13 @@
 """
 HA Vibecode Agent - FastAPI Application
-Enables AI assistants (Cursor AI, VS Code + Copilot) to manage Home Assistant configuration
+Enables AI assistants (Cursor AI, VS Code + Copilot, Mistral Vibe) to manage Home Assistant configuration
 """
 import os
 import logging
 import aiohttp
 import secrets
 from pathlib import Path
+from typing import Optional
 from fastapi import FastAPI, HTTPException, Depends, Security, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +17,8 @@ from app.api import files, entities, helpers, automations, scripts, system, back
 from app.utils.logger import setup_logger
 from app.ingress_panel import generate_ingress_html
 from app.services import ha_websocket
-from app.env import load_env
+from app.services.mistral_client import MistralVibeClient
+from app.env import load_env, get_mistral_config, validate_mistral_config
 load_env()
 
 from app.auth import verify_token, set_api_key, security
@@ -82,6 +84,10 @@ API_KEY_FILE = Path('/config/.ha_cursor_agent_key')
 # Global variable for API key
 API_KEY = None
 
+# Mistral Vibe configuration
+MISTRAL_CONFIG = get_mistral_config()
+mistral_client: Optional[MistralVibeClient] = None
+
 
 def mask_api_key(key: str) -> str:
     """Mask API key for safe logging"""
@@ -141,6 +147,7 @@ set_api_key(API_KEY)  # Set API key in auth module
 # Log startup configuration
 supervisor_token_status = "PRESENT" if SUPERVISOR_TOKEN else "MISSING"
 dev_token_status = "PRESENT" if DEV_TOKEN else "MISSING"
+mistral_status = "ENABLED" if MISTRAL_CONFIG["enabled"] else "DISABLED"
 
 logger.info(f"=================================")
 logger.info(f"HA Vibecode Agent v{AGENT_VERSION}")
@@ -153,6 +160,10 @@ else:
     logger.info(f"Mode: Development (using DEV_TOKEN)")
 logger.info(f"HA_URL: {HA_URL}")
 logger.info(f"API Key (for MCP client): {'Custom (from config)' if API_KEY_FROM_CONFIG else 'Auto-generated'}")
+logger.info(f"Mistral Vibe: {mistral_status}")
+if MISTRAL_CONFIG["enabled"]:
+    logger.info(f"  API URL: {MISTRAL_CONFIG['api_url']}")
+    logger.info(f"  Default Model: {MISTRAL_CONFIG['default_model']}")
 logger.info(f"=================================")
 
 
@@ -164,6 +175,32 @@ async def startup_event():
     if SUPERVISOR_TOKEN:
         from app.services.supervisor_client import supervisor_client
         logger.info(f"✅ SupervisorClient ready - URL: {supervisor_client.base_url}")
+    
+    # Initialize Mistral Vibe client if configured
+    global mistral_client
+    try:
+        if MISTRAL_CONFIG["enabled"]:
+            logger.info("Initializing Mistral Vibe client...")
+            mistral_client = MistralVibeClient(
+                api_url=MISTRAL_CONFIG["api_url"],
+                api_key=MISTRAL_CONFIG["api_key"],
+                default_model=MISTRAL_CONFIG["default_model"],
+                timeout=MISTRAL_CONFIG["timeout"],
+                max_retries=MISTRAL_CONFIG["max_retries"]
+            )
+            await mistral_client.start()
+            
+            # Perform health check
+            is_healthy = await mistral_client.health_check()
+            if is_healthy:
+                logger.info("✅ Mistral Vibe client started and healthy")
+            else:
+                logger.warning("⚠️ Mistral Vibe client started but health check failed")
+        else:
+            logger.info("📋 Mistral Vibe is not configured (set MISTRAL_VIBE_API_URL and MISTRAL_VIBE_API_KEY to enable)")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize Mistral Vibe client: {e}")
+        mistral_client = None
     
     # Only start WebSocket if we have SUPERVISOR_TOKEN (running as add-on)
     if SUPERVISOR_TOKEN:
@@ -180,7 +217,15 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Stop WebSocket client on shutdown"""
+    """Stop WebSocket client and Mistral Vibe client on shutdown"""
+    # Stop Mistral Vibe client
+    global mistral_client
+    if mistral_client:
+        logger.info("Stopping Mistral Vibe client...")
+        await mistral_client.stop()
+        logger.info("✅ Mistral Vibe client stopped")
+    
+    # Stop WebSocket client
     if ha_websocket.ha_ws_client:
         logger.info("Stopping WebSocket client...")
         await ha_websocket.ha_ws_client.stop()
@@ -205,6 +250,10 @@ app.include_router(lovelace.router, prefix="/api/lovelace", tags=["Lovelace"], d
 app.include_router(themes.router, prefix="/api/themes", tags=["Themes"], dependencies=[Depends(verify_token)])
 app.include_router(registries.router, prefix="/api/registries", tags=["Registries"], dependencies=[Depends(verify_token)])
 app.include_router(ai_instructions.router, prefix="/api/ai")
+
+# Mistral Vibe API endpoints
+from app.api.mistral import router as mistral_router
+app.include_router(mistral_router, prefix="/api/mistral", tags=["Mistral Vibe"], dependencies=[Depends(verify_token)])
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -610,12 +659,27 @@ async def old_ingress_panel():
 @app.get("/api/health")
 async def health():
     """Health check endpoint (no auth required)"""
+    mistral_status = "disabled"
+    if MISTRAL_CONFIG["enabled"]:
+        mistral_status = "configured"
+        if mistral_client:
+            try:
+                is_healthy = await mistral_client.health_check()
+                mistral_status = "healthy" if is_healthy else "unhealthy"
+            except Exception:
+                mistral_status = "error"
+    
     return {
         "status": "healthy",
         "version": AGENT_VERSION,
         "config_path": os.getenv('CONFIG_PATH', '/config'),
         "git_versioning_auto": os.getenv('GIT_VERSIONING_AUTO', 'true') == 'true',
-        "ai_instructions": "/api/ai/instructions"
+        "ai_instructions": "/api/ai/instructions",
+        "mistral_vibe": {
+            "status": mistral_status,
+            "enabled": MISTRAL_CONFIG["enabled"],
+            "default_model": MISTRAL_CONFIG["default_model"] if MISTRAL_CONFIG["enabled"] else None
+        }
     }
 
 

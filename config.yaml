@@ -25,6 +25,11 @@ options:
   git_versioning_auto: true
   max_backups: 30
   api_key: ""
+  mistral_vibe_api_url: ""
+  mistral_vibe_api_key: ""
+  mistral_vibe_default_model: "mistral-tiny"
+  mistral_vibe_timeout: 30
+  mistral_vibe_max_retries: 3
 
 schema:
   port: int
@@ -32,6 +37,11 @@ schema:
   git_versioning_auto: bool
   max_backups: int
   api_key: str?
+  mistral_vibe_api_url: str?
+  mistral_vibe_api_key: str?
+  mistral_vibe_default_model: str?
+  mistral_vibe_timeout: int?
+  mistral_vibe_max_retries: int?
 
 ports:
   8099/tcp: 8099
