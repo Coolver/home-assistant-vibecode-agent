@@ -1,6 +1,20 @@
 """Pydantic models for API"""
+import json
 from pydantic import BaseModel, Field, model_validator
 from typing import Optional, Dict, Any, List
+
+
+def _parse_json_string(value: Any) -> Any:
+    """Parse JSON object/array encoded as string."""
+    if not isinstance(value, str):
+        return value
+    stripped = value.strip()
+    if not stripped or stripped[0] not in ("{", "["):
+        return value
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        return value
 
 class FileContent(BaseModel):
     """File content model"""
@@ -27,6 +41,13 @@ class HelperCreate(BaseModel):
     config: Dict[str, Any] = Field(..., description="Helper configuration including 'name' and other options")
     commit_message: Optional[str] = Field(None, description="Custom commit message for Git backup (e.g., 'Add helper: climate system enabled switch')")
 
+    @model_validator(mode='before')
+    @classmethod
+    def parse_config_if_json_string(cls, data):
+        if isinstance(data, dict) and 'config' in data:
+            data['config'] = _parse_json_string(data['config'])
+        return data
+
 class AutomationData(BaseModel):
     """Automation data model.
 
@@ -51,6 +72,9 @@ class AutomationData(BaseModel):
     def normalize_plural_fields(cls, data):
         """Accept triggers/conditions/actions (plural) and map to singular."""
         if isinstance(data, dict):
+            for key in ('trigger', 'condition', 'action', 'triggers', 'conditions', 'actions'):
+                if key in data:
+                    data[key] = _parse_json_string(data[key])
             if 'triggers' in data and 'trigger' not in data:
                 data['trigger'] = data['triggers']
             if 'conditions' in data and 'condition' not in data:

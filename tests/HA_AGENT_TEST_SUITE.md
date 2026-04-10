@@ -21,6 +21,7 @@
 - [Dashboards](#10-dashboard-operations-4-tests) (4 tests)
 - [Repositories](#11-repository-operations-2-tests) (2 tests)
 - [Logbook](#12-logbook-operations-1-test) (1 test)
+- [Structured Params Regression](#14-structured-params-regression-post-update) (8 tests)
 
 **Total:** 69 tests
 
@@ -741,6 +742,21 @@ To avoid context loss during large test runs, tests are broken down into small, 
 - **Parameters:** `{}`  
 - **Expected:** List of scripts
 
+**Step 6.2:** `test_list_automations_paginated`  
+- **MCP Tool:** `ha_list_automations`  
+- **Parameters:** `{ page: 1, page_size: 250 }`  
+- **Expected:** Paginated response with metadata fields (`total`, `page`, `page_size`, `total_pages`, `has_next`) and first chunk of automations.
+
+**Step 6.3:** `test_list_scripts_paginated_search`  
+- **MCP Tool:** `ha_list_scripts`  
+- **Parameters:** `{ search: "kitchen", page: 1, page_size: 250 }`  
+- **Expected:** Filtered paginated scripts list and metadata fields.
+
+**Step 6.4:** `test_list_automations_full_list_legacy_mode`  
+- **MCP Tool:** `ha_list_automations`  
+- **Parameters:** `{ full_list: true }`  
+- **Expected:** Full list response for legacy flows, still with standard pagination metadata.
+
 #### Phase 7: Read-Only System Operations (2 steps)
 
 **Step 7.1:** `test_check_config`  
@@ -963,6 +979,129 @@ HA_AGENT_KEY=<your-token>
 - Restore registry changes (entity names, area names, device names)
 - Delete test areas created during tests
 - Rollback to pre-test git commit (optional)
+
+---
+
+## 14. Structured Params Regression (Post-Update)
+
+**Purpose:** Verify object/array tool arguments are preserved after updating HA Vibecode Agent and MCP in Cursor.
+
+### 14.1 Prerequisites
+- Deploy updated `home-assistant-cursor-agent`
+- Deploy updated `@coolver/home-assistant-mcp`
+- Reconnect MCP in Cursor (or restart Cursor)
+
+### 14.2 Local Unit Tests (run from Cursor terminal)
+
+#### MCP package tests
+```bash
+cd /Users/Coolver_1/Projects/smart-home/home-assistant-mcp
+npm test
+```
+**Expected:** 4/4 passing tests in `tests/arg-normalizer.test.js`
+
+#### Agent parser/model tests
+```bash
+cd /Users/Coolver_1/Projects/smart-home/home-assistant-cursor-agent
+python3.12 -m venv .venv312
+source .venv312/bin/activate
+pip install -r requirements.txt
+python -m unittest tests.test_structured_args_parsing -v
+```
+**Expected:** 6/6 passing tests in `tests/test_structured_args_parsing.py`
+
+### 14.3 MCP Runtime Regression Checks (manual, from AI client)
+
+#### test_structured_call_service_with_service_data
+**Function:** `ha_call_service`  
+**Parameters:**
+```json
+{
+  "domain": "automation",
+  "service": "trigger",
+  "service_data": {
+    "entity_id": "automation.some_automation"
+  }
+}
+```
+**Expected:** No validation error, payload is not dropped.
+
+#### test_structured_call_service_with_legacy_data_alias
+**Function:** `ha_call_service`  
+**Parameters:**
+```json
+{
+  "domain": "automation",
+  "service": "trigger",
+  "data": {
+    "entity_id": "automation.some_automation"
+  }
+}
+```
+**Expected:** Works via alias `data -> service_data`.
+
+#### test_update_entity_registry_aliases_array
+**Function:** `ha_update_entity_registry`  
+**Parameters:**
+```json
+{
+  "entity_id": "climate.downstairs_ac",
+  "aliases": ["AC", "downstairs AC"]
+}
+```
+**Expected:** Accepted as native array.
+
+#### test_update_entity_registry_aliases_json_string
+**Function:** `ha_update_entity_registry`  
+**Parameters:**
+```json
+{
+  "entity_id": "climate.downstairs_ac",
+  "aliases": "[\"AC\",\"downstairs AC\"]"
+}
+```
+**Expected:** Accepted via JSON-string fallback.
+
+#### test_create_helper_config_object
+**Function:** `ha_create_helper`  
+**Parameters:**
+```json
+{
+  "type": "input_boolean",
+  "config": {
+    "name": "Structured Param Test Helper",
+    "icon": "mdi:test-tube"
+  }
+}
+```
+**Expected:** Helper created without object validation error.
+
+#### test_create_helper_config_json_string
+**Function:** `ha_create_helper`  
+**Parameters:**
+```json
+{
+  "type": "input_boolean",
+  "config": "{\"name\":\"Structured Param Test Helper String\",\"icon\":\"mdi:test\"}"
+}
+```
+**Expected:** Accepted via JSON-string fallback.
+
+#### test_create_automation_config_object
+**Function:** `ha_create_automation`  
+**Parameters:** `config` as native object  
+**Expected:** Automation created successfully.
+
+#### test_create_automation_triggers_actions_json_strings
+**Function:** `ha_create_automation`  
+**Parameters:** `config.triggers` / `config.actions` as JSON strings  
+**Expected:** Parsed and accepted by agent model fallback.
+
+### 14.4 Release-Ready Criteria
+- MCP unit tests pass.
+- Agent unit tests pass.
+- All 8 runtime regression checks pass.
+- `ha_get_logs` has no new unexpected `ERROR` entries related to validation or dropped payload.
 
 ---
 

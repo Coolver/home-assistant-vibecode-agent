@@ -11,12 +11,19 @@ from app.services.file_manager import file_manager
 from app.services.ha_client import ha_client
 from app.services.git_manager import git_manager
 from app.services.ha_websocket import get_ws_client
+from app.utils.pagination import filter_items_by_search, paginate_items
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
 
 @router.get("/list")
-async def list_scripts(ids_only: bool = Query(False, description="If true, return only script IDs without full configurations")):
+async def list_scripts(
+    ids_only: bool = Query(False, description="If true, return only script IDs without full configurations"),
+    search: Optional[str] = Query(None, description="Case-insensitive substring search by script id or alias"),
+    page: int = Query(1, ge=1, description="Page number (1-based, default 1)"),
+    page_size: int = Query(250, ge=1, le=500, description="Items per page (default 250, max 500)"),
+    full_list: bool = Query(False, description="If true, return full list without pagination (legacy behavior)"),
+):
     """
     List all scripts from Home Assistant (via API)
     
@@ -27,7 +34,10 @@ async def list_scripts(ids_only: bool = Query(False, description="If true, retur
     - Created via UI (stored in .storage)
     
     **Parameters:**
-    - `ids_only` (optional): If `true`, returns only list of script IDs. If `false` (default), returns full script configurations.
+    - `ids_only` (optional): If `true`, returns only list of script IDs.
+    - `search` (optional): Substring search in script id and alias.
+    - `page` / `page_size` (optional): Pagination controls. Defaults to page=1, page_size=250.
+    - `full_list` (optional): If `true`, returns the complete result without pagination.
     
     **Example response (ids_only=false):**
     ```json
@@ -53,18 +63,40 @@ async def list_scripts(ids_only: bool = Query(False, description="If true, retur
     try:
         # Get all scripts from HA API (includes all sources: files, packages, UI)
         scripts = await ha_client.list_scripts()
-        
+        script_items = [{"id": script_id, "config": config} for script_id, config in scripts.items()]
+        script_items = filter_items_by_search(
+            script_items,
+            search,
+            extractors=[
+                lambda item: item.get("id"),
+                lambda item: (item.get("config") or {}).get("alias") if isinstance(item.get("config"), dict) else None,
+            ],
+        )
+        paged = paginate_items(script_items, page=page, page_size=page_size, full_list=full_list)
+
         if ids_only:
             return {
                 "success": True,
-                "count": len(scripts),
-                "script_ids": list(scripts.keys())
+                "count": len(paged["items"]),
+                "total": paged["total"],
+                "page": paged["page"],
+                "page_size": paged["page_size"],
+                "total_pages": paged["total_pages"],
+                "has_next": paged["has_next"],
+                "next_page": paged["next_page"],
+                "script_ids": [item["id"] for item in paged["items"]],
             }
-        
+
         return {
             "success": True,
-            "count": len(scripts),
-            "scripts": scripts
+            "count": len(paged["items"]),
+            "total": paged["total"],
+            "page": paged["page"],
+            "page_size": paged["page_size"],
+            "total_pages": paged["total_pages"],
+            "has_next": paged["has_next"],
+            "next_page": paged["next_page"],
+            "scripts": {item["id"]: item["config"] for item in paged["items"]},
         }
     except Exception as e:
         logger.error(f"Failed to list scripts via API: {e}")

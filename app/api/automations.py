@@ -11,12 +11,19 @@ from app.services.file_manager import file_manager
 from app.services.ha_client import ha_client
 from app.services.git_manager import git_manager
 from app.services.ha_websocket import get_ws_client
+from app.utils.pagination import filter_items_by_search, paginate_items
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
 
 @router.get("/list")
-async def list_automations(ids_only: bool = Query(False, description="If true, return only automation IDs without full configurations")):
+async def list_automations(
+    ids_only: bool = Query(False, description="If true, return only automation IDs without full configurations"),
+    search: Optional[str] = Query(None, description="Case-insensitive substring search by automation id or alias"),
+    page: int = Query(1, ge=1, description="Page number (1-based, default 1)"),
+    page_size: int = Query(250, ge=1, le=500, description="Items per page (default 250, max 500)"),
+    full_list: bool = Query(False, description="If true, return full list without pagination (legacy behavior)"),
+):
     """
     List all automations from Home Assistant (via API)
     
@@ -29,7 +36,10 @@ async def list_automations(ids_only: bool = Query(False, description="If true, r
     This ensures you see all 159 automations, not just the 4 in automations.yaml.
     
     **Parameters:**
-    - `ids_only` (optional): If `true`, returns only list of automation IDs. If `false` (default), returns full automation configurations.
+    - `ids_only` (optional): If `true`, returns only list of automation IDs.
+    - `search` (optional): Substring search in automation id and alias.
+    - `page` / `page_size` (optional): Pagination controls. Defaults to page=1, page_size=250.
+    - `full_list` (optional): If `true`, returns the complete result without pagination.
     
     **Example response (ids_only=false):**
     ```json
@@ -56,18 +66,46 @@ async def list_automations(ids_only: bool = Query(False, description="If true, r
         # Fast path: when only IDs are requested, use optimized ids_only mode in ha_client
         if ids_only:
             automation_ids = await ha_client.list_automations(ids_only=True)
+            if search:
+                automation_ids = filter_items_by_search(
+                    automation_ids,
+                    search,
+                    extractors=[lambda value: value],
+                )
+            paged = paginate_items(automation_ids, page=page, page_size=page_size, full_list=full_list)
             return {
                 "success": True,
-                "count": len(automation_ids),
-                "automation_ids": automation_ids
+                "count": len(paged["items"]),
+                "total": paged["total"],
+                "page": paged["page"],
+                "page_size": paged["page_size"],
+                "total_pages": paged["total_pages"],
+                "has_next": paged["has_next"],
+                "next_page": paged["next_page"],
+                "automation_ids": paged["items"],
             }
         
         # Full path: return full automation configurations
         automations = await ha_client.list_automations()
+        automations = filter_items_by_search(
+            automations,
+            search,
+            extractors=[
+                lambda item: item.get("id") if isinstance(item, dict) else None,
+                lambda item: item.get("alias") if isinstance(item, dict) else None,
+            ],
+        )
+        paged = paginate_items(automations, page=page, page_size=page_size, full_list=full_list)
         return {
             "success": True,
-            "count": len(automations),
-            "automations": automations
+            "count": len(paged["items"]),
+            "total": paged["total"],
+            "page": paged["page"],
+            "page_size": paged["page_size"],
+            "total_pages": paged["total_pages"],
+            "has_next": paged["has_next"],
+            "next_page": paged["next_page"],
+            "automations": paged["items"],
         }
     except Exception as e:
         logger.error(f"Failed to list automations via API: {e}")

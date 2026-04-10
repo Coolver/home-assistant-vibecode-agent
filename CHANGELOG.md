@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.42] - 2026-04-10
+
+**Release prepared with thanks to:** [@ctaylor86](https://github.com/ctaylor86), [@johny-mnemonic](https://github.com/johny-mnemonic), and [@wilsto](https://github.com/wilsto).
+
+### Smarter lists for big Home Assistant setups
+
+**Before:** Browsing **entities** already worked in a “large home–friendly” way (chunks, filters, so your AI did not have to swallow thousands of devices at once). Almost everything else still came back as **one giant list** in a single reply: all automations, all scripts, full registries, helpers, add-on store, HACS repos, long file listings, and data for dashboard ideas. On a busy system that meant huge responses, slow tools, and assistants running out of context.
+
+**After:** The same idea now applies broadly. You get **manageable slices** by default (roughly a few hundred items per request), a clear **“there is more”** signal, and simple ways to **search or narrow** (by name, area, domain, and similar) before pulling the next chunk. That covers automations and scripts, entity/device/area registries, helpers, browsing add-ons and HACS, listing config files, and the entity snapshot used when building dashboards—including a lighter “summary” style when you only need an overview.
+
+**If you really need everything in one go** (scripts, migrations, or custom integrations), you can still ask for the full list in one shot—same behaviour as before, just opt-in so day-to-day use stays safe by default.
+
+### Fewer surprises when the assistant passes “rich” settings
+
+After system updates, some users saw helpers, automations, registry tweaks, or service-style actions fail even though the same wording worked before—often because settings arrived as text blobs instead of structured pieces, or because the name everyone uses in Home Assistant for “what to send with the action” didn’t line up with what the agent expected, so the important part never made it through. This release makes those paths more forgiving on the agent side as well, so everyday “change this, add that” flows stay dependable alongside the new list behaviour above.
+
 ## [2.10.40] - 2026-03-10
 
 ### ✨ Voice assistant exposure controls + split-directory config support (release prepared by @wilsto)

@@ -3,11 +3,25 @@ from fastapi import APIRouter, HTTPException, Query, Body
 from typing import List, Optional, Dict, Any
 import logging
 import math
+import json
 
 from app.services.ha_client import ha_client
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
+
+def _parse_dict_like(value: Any) -> Optional[Dict[str, Any]]:
+    """Parse dict-like value from object or JSON string."""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            return None
+    return None
 
 
 @router.get("/list")
@@ -207,8 +221,9 @@ async def list_services():
 async def call_service(
     domain: str = Body(..., description="Service domain (e.g., 'number', 'light', 'climate')"),
     service: str = Body(..., description="Service name (e.g., 'set_value', 'turn_on', 'set_temperature')"),
-    service_data: Optional[Dict[str, Any]] = Body(None, description="Service data (e.g., {'entity_id': 'number.alex_trv_local_temperature_offset', 'value': -2.0})"),
-    target: Optional[Dict[str, Any]] = Body(None, description="Target entity/entities (e.g., {'entity_id': 'light.living_room'})")
+    service_data: Optional[Any] = Body(None, description="Service data (e.g., {'entity_id': 'number.alex_trv_local_temperature_offset', 'value': -2.0})"),
+    target: Optional[Any] = Body(None, description="Target entity/entities (e.g., {'entity_id': 'light.living_room'})"),
+    data_alias: Optional[Any] = Body(None, alias="data", description="Backward-compatible alias for service_data"),
 ):
     """
     Call a Home Assistant service
@@ -219,6 +234,13 @@ async def call_service(
     - Set climate temperature: {"domain": "climate", "service": "set_temperature", "target": {"entity_id": "climate.bedroom_trv_thermostat"}, "service_data": {"temperature": 21.0}}
     """
     try:
+        service_data = _parse_dict_like(service_data)
+
+        if service_data is None and data_alias is not None:
+            service_data = _parse_dict_like(data_alias)
+
+        target = _parse_dict_like(target)
+
         # Combine service_data and target into data dict
         # In Home Assistant API, target is merged with service_data
         data = {}

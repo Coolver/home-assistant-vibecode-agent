@@ -9,6 +9,7 @@ from app.models.schemas import HelperCreate, Response
 from app.services.ha_client import ha_client
 from app.services.ha_websocket import get_ws_client
 from app.services.git_manager import git_manager
+from app.utils.pagination import filter_items_by_search, paginate_items
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
@@ -119,7 +120,13 @@ async def debug_services():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/list")
-async def list_helpers():
+async def list_helpers(
+    domain: Optional[str] = Query(None, description="Optional helper domain filter (e.g. input_boolean, input_number, group)"),
+    search: Optional[str] = Query(None, description="Case-insensitive substring search in entity_id or friendly_name"),
+    page: int = Query(1, ge=1, description="Page number (1-based, default 1)"),
+    page_size: int = Query(250, ge=1, le=500, description="Items per page (default 250, max 500)"),
+    full_list: bool = Query(False, description="If true, return full list without pagination"),
+):
     """
     List all helper-like entities
     
@@ -153,17 +160,37 @@ async def list_helpers():
         
         # Filter helper-like entities
         helper_domains = ['input_boolean', 'input_text', 'input_number', 'input_datetime', 'input_select', 'group', 'utility_meter']
+        if domain:
+            helper_domains = [domain]
         helpers = [
             entity for entity in all_states 
             if any(entity['entity_id'].startswith(f"{domain}.") for domain in helper_domains)
         ]
+        helpers = filter_items_by_search(
+            helpers,
+            search,
+            extractors=[
+                lambda item: item.get("entity_id"),
+                lambda item: (item.get("attributes") or {}).get("friendly_name"),
+            ],
+        )
+        paged = paginate_items(helpers, page=page, page_size=page_size, full_list=full_list)
         
-        logger.info(f"Listed {len(helpers)} helpers")
+        logger.info(
+            f"Listed {len(paged['items'])} helpers "
+            f"(page {paged['page']}/{paged['total_pages'] or 1}, total={paged['total']})"
+        )
         
         return {
             "success": True,
-            "count": len(helpers),
-            "helpers": helpers
+            "count": len(paged["items"]),
+            "total": paged["total"],
+            "page": paged["page"],
+            "page_size": paged["page_size"],
+            "total_pages": paged["total_pages"],
+            "has_next": paged["has_next"],
+            "next_page": paged["next_page"],
+            "helpers": paged["items"],
         }
     except Exception as e:
         logger.error(f"Failed to list helpers: {e}")

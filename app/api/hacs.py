@@ -1,5 +1,5 @@
 """HACS API endpoints"""
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 import logging
 import aiohttp
 import zipfile
@@ -26,6 +26,7 @@ from app.models.schemas import Response
 from app.services.ha_client import ha_client
 from app.services.ha_websocket import get_ws_client
 from app.auth import verify_token
+from app.utils.pagination import filter_items_by_search, paginate_items
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
@@ -226,7 +227,13 @@ async def get_hacs_status():
 
 
 @router.get("/repositories", response_model=Response, dependencies=[Depends(verify_token)])
-async def list_hacs_repositories(category: Optional[str] = None):
+async def list_hacs_repositories(
+    category: Optional[str] = None,
+    search: Optional[str] = Query(None, description="Case-insensitive substring search in repository full_name/name/description"),
+    page: int = Query(1, ge=1, description="Page number (1-based, default 1)"),
+    page_size: int = Query(250, ge=1, le=500, description="Items per page (default 250, max 500)"),
+    full_list: bool = Query(False, description="If true, return full list without pagination"),
+):
     """
     List HACS repositories by reading storage file
     
@@ -324,13 +331,26 @@ async def list_hacs_repositories(category: Optional[str] = None):
             except Exception as e:
                 logger.error(f"Failed to get HACS repositories: {e}")
         
+        hacs_repos = filter_items_by_search(
+            hacs_repos,
+            search,
+            extractors=[lambda item: item.get("full_name"), lambda item: item.get("name"), lambda item: item.get("description")],
+        )
+        paged = paginate_items(hacs_repos, page=page, page_size=page_size, full_list=full_list)
+
         return Response(
             success=True,
-            message=f"Found {len(hacs_repos)} HACS repositories",
+            message=f"Found {paged['total']} HACS repositories; returned {len(paged['items'])} on current page",
             data={
-                'repositories': hacs_repos,
-                'count': len(hacs_repos),
-                'category': category or 'all'
+                'repositories': paged["items"],
+                'count': len(paged["items"]),
+                'total': paged["total"],
+                'page': paged["page"],
+                'page_size': paged["page_size"],
+                'total_pages': paged["total_pages"],
+                'has_next': paged["has_next"],
+                'next_page': paged["next_page"],
+                'category': category or 'all',
             }
         )
         

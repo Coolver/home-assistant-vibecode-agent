@@ -1,5 +1,5 @@
 """Lovelace Dashboard API Endpoints"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import logging
@@ -10,6 +10,7 @@ from app.auth import verify_token
 from app.services.ha_client import ha_client
 from app.services.file_manager import file_manager
 from app.services.git_manager import git_manager
+from app.utils.pagination import paginate_items
 from app.utils.yaml_editor import YAMLEditor
 
 logger = logging.getLogger('ha_cursor_agent')
@@ -194,7 +195,13 @@ class ApplyDashboardRequest(BaseModel):
 # ==================== Endpoints ====================
 
 @router.get("/analyze", response_model=Response, dependencies=[Depends(verify_token)])
-async def analyze_entities():
+async def analyze_entities(
+    domains: Optional[List[str]] = Query(None, description="Optional list of domains to include (e.g. climate, light, sensor)"),
+    summary_only: bool = Query(False, description="If true, return lightweight entity summaries"),
+    page: int = Query(1, ge=1, description="Page number (1-based, default 1)"),
+    page_size: int = Query(250, ge=1, le=500, description="Items per page (default 250, max 500)"),
+    full_list: bool = Query(False, description="If true, return full list without pagination"),
+):
     """
     Analyze entities and provide data for AI-driven dashboard generation
     
@@ -211,6 +218,12 @@ async def analyze_entities():
         
         # Get all entities from Home Assistant
         entities = await ha_client.get_states()
+        domain_filter = {value.lower() for value in domains} if domains else None
+        if domain_filter:
+            entities = [
+                entity for entity in entities
+                if entity.get("entity_id", "").split(".", 1)[0].lower() in domain_filter
+            ]
         
         if not entities or len(entities) == 0:
             return Response(
@@ -219,26 +232,56 @@ async def analyze_entities():
                 data={}
             )
         
+        paged = paginate_items(entities, page=page, page_size=page_size, full_list=full_list)
+        page_entities = paged["items"]
+
         # Simple grouping by domain (no generation logic)
         from collections import defaultdict
         by_domain = defaultdict(list)
         
-        for entity in entities:
+        for entity in page_entities:
             entity_id = entity.get('entity_id', '')
             domain = entity_id.split('.')[0] if '.' in entity_id else 'unknown'
-            by_domain[domain].append({
-                'entity_id': entity_id,
-                'state': entity.get('state'),
-                'attributes': entity.get('attributes', {}),
-                'friendly_name': entity.get('attributes', {}).get('friendly_name', entity_id)
-            })
+            if summary_only:
+                by_domain[domain].append({
+                    'entity_id': entity_id,
+                    'state': entity.get('state'),
+                    'domain': domain,
+                    'friendly_name': entity.get('attributes', {}).get('friendly_name', entity_id),
+                })
+            else:
+                by_domain[domain].append({
+                    'entity_id': entity_id,
+                    'state': entity.get('state'),
+                    'attributes': entity.get('attributes', {}),
+                    'friendly_name': entity.get('attributes', {}).get('friendly_name', entity_id)
+                })
+
+        if summary_only:
+            entities_payload = [
+                {
+                    'entity_id': entity.get('entity_id'),
+                    'state': entity.get('state'),
+                    'domain': entity.get('entity_id', '').split('.', 1)[0] if '.' in entity.get('entity_id', '') else 'unknown',
+                    'friendly_name': entity.get('attributes', {}).get('friendly_name', entity.get('entity_id')),
+                }
+                for entity in page_entities
+            ]
+        else:
+            entities_payload = page_entities
         
         return Response(
             success=True,
-            message=f"Found {len(entities)} entities for AI analysis",
+            message=f"Found {paged['total']} entities for AI analysis; returned {len(entities_payload)} on current page",
             data={
-                'total_entities': len(entities),
-                'entities': entities,
+                'total_entities': paged["total"],
+                'count': len(entities_payload),
+                'page': paged["page"],
+                'page_size': paged["page_size"],
+                'total_pages': paged["total_pages"],
+                'has_next': paged["has_next"],
+                'next_page': paged["next_page"],
+                'entities': entities_payload,
                 'by_domain': dict(by_domain),
                 'domain_counts': {domain: len(ents) for domain, ents in by_domain.items()}
             }

@@ -3,18 +3,41 @@ from fastapi import APIRouter, HTTPException, Query, Body
 from typing import List, Optional, Dict, Any
 import logging
 import yaml
+import json
 
 from app.services.ha_websocket import get_ws_client
 from app.services.file_manager import file_manager
 from app.models.schemas import Response, EntityRemoveRequest, AreaRemoveRequest, DeviceRemoveRequest
+from app.utils.pagination import filter_items_by_search, paginate_items
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
 
+def _parse_aliases(value: Any) -> Optional[List[str]]:
+    """Parse aliases from list or JSON string."""
+    if value is None:
+        return None
+    parsed = value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=422, detail="Invalid aliases JSON string") from exc
+    if not isinstance(parsed, list) or not all(isinstance(alias, str) for alias in parsed):
+        raise HTTPException(status_code=422, detail="aliases must be an array of strings")
+    return parsed
+
 # ==================== Entity Registry ====================
 
 @router.get("/entities/list")
-async def list_entity_registry():
+async def list_entity_registry(
+    search: Optional[str] = Query(None, description="Case-insensitive substring search in entity_id, name, original_name"),
+    domain: Optional[str] = Query(None, description="Filter by entity domain (e.g. climate, light)"),
+    area_id: Optional[str] = Query(None, description="Filter by area_id"),
+    page: int = Query(1, ge=1, description="Page number (1-based, default 1)"),
+    page_size: int = Query(250, ge=1, le=500, description="Items per page (default 250, max 500)"),
+    full_list: bool = Query(False, description="If true, return full list without pagination"),
+):
     """
     Get all entities from Entity Registry
     
@@ -29,11 +52,36 @@ async def list_entity_registry():
         ws_client = await get_ws_client()
         entities = await ws_client.get_entity_registry_list()
         
-        logger.info(f"Listed {len(entities)} entities from Entity Registry")
+        if domain:
+            prefix = f"{domain.lower()}."
+            entities = [item for item in entities if str(item.get("entity_id", "")).lower().startswith(prefix)]
+        if area_id:
+            entities = [item for item in entities if item.get("area_id") == area_id]
+        entities = filter_items_by_search(
+            entities,
+            search,
+            extractors=[
+                lambda item: item.get("entity_id"),
+                lambda item: item.get("name"),
+                lambda item: item.get("original_name"),
+            ],
+        )
+        paged = paginate_items(entities, page=page, page_size=page_size, full_list=full_list)
+
+        logger.info(
+            f"Listed {len(paged['items'])} entities from Entity Registry "
+            f"(page {paged['page']}/{paged['total_pages'] or 1}, total={paged['total']})"
+        )
         return {
             "success": True,
-            "count": len(entities),
-            "entities": entities
+            "count": len(paged["items"]),
+            "total": paged["total"],
+            "page": paged["page"],
+            "page_size": paged["page_size"],
+            "total_pages": paged["total_pages"],
+            "has_next": paged["has_next"],
+            "next_page": paged["next_page"],
+            "entities": paged["items"],
         }
     except Exception as e:
         logger.error(f"Failed to list Entity Registry: {e}")
@@ -177,7 +225,7 @@ async def update_entity_registry(
     disabled: Optional[bool] = Body(None, description="Disable/enable entity"),
     new_entity_id: Optional[str] = Body(None, description="New entity_id (rename)"),
     icon: Optional[str] = Body(None, description="Icon for entity"),
-    aliases: Optional[List[str]] = Body(None, description="Aliases for entity")
+    aliases: Optional[Any] = Body(None, description="Aliases for entity")
 ):
     """
     Update entity in Entity Registry
@@ -218,7 +266,7 @@ async def update_entity_registry(
         if icon is not None:
             update_data['icon'] = icon
         if aliases is not None:
-            update_data['aliases'] = aliases
+            update_data['aliases'] = _parse_aliases(aliases)
         
         if not update_data:
             raise HTTPException(status_code=400, detail="No fields provided for update")
@@ -275,7 +323,12 @@ async def remove_entity_registry_entry(request: EntityRemoveRequest):
 # ==================== Area Registry ====================
 
 @router.get("/areas/list")
-async def list_area_registry():
+async def list_area_registry(
+    search: Optional[str] = Query(None, description="Case-insensitive substring search in area_id or area name"),
+    page: int = Query(1, ge=1, description="Page number (1-based, default 1)"),
+    page_size: int = Query(250, ge=1, le=500, description="Items per page (default 250, max 500)"),
+    full_list: bool = Query(False, description="If true, return full list without pagination"),
+):
     """
     Get all areas from Area Registry
     
@@ -285,11 +338,26 @@ async def list_area_registry():
         ws_client = await get_ws_client()
         areas = await ws_client.get_area_registry_list()
         
-        logger.info(f"Listed {len(areas)} areas from Area Registry")
+        areas = filter_items_by_search(
+            areas,
+            search,
+            extractors=[lambda item: item.get("area_id"), lambda item: item.get("name")],
+        )
+        paged = paginate_items(areas, page=page, page_size=page_size, full_list=full_list)
+        logger.info(
+            f"Listed {len(paged['items'])} areas from Area Registry "
+            f"(page {paged['page']}/{paged['total_pages'] or 1}, total={paged['total']})"
+        )
         return {
             "success": True,
-            "count": len(areas),
-            "areas": areas
+            "count": len(paged["items"]),
+            "total": paged["total"],
+            "page": paged["page"],
+            "page_size": paged["page_size"],
+            "total_pages": paged["total_pages"],
+            "has_next": paged["has_next"],
+            "next_page": paged["next_page"],
+            "areas": paged["items"],
         }
     except Exception as e:
         logger.error(f"Failed to list Area Registry: {e}")
@@ -414,7 +482,13 @@ async def delete_area_registry_entry(request: AreaRemoveRequest):
 # ==================== Device Registry ====================
 
 @router.get("/devices/list")
-async def list_device_registry():
+async def list_device_registry(
+    search: Optional[str] = Query(None, description="Case-insensitive substring search in device id/name/model/manufacturer"),
+    area_id: Optional[str] = Query(None, description="Filter by area_id"),
+    page: int = Query(1, ge=1, description="Page number (1-based, default 1)"),
+    page_size: int = Query(250, ge=1, le=500, description="Items per page (default 250, max 500)"),
+    full_list: bool = Query(False, description="If true, return full list without pagination"),
+):
     """
     Get all devices from Device Registry
     
@@ -424,11 +498,33 @@ async def list_device_registry():
         ws_client = await get_ws_client()
         devices = await ws_client.get_device_registry_list()
         
-        logger.info(f"Listed {len(devices)} devices from Device Registry")
+        if area_id:
+            devices = [item for item in devices if item.get("area_id") == area_id]
+        devices = filter_items_by_search(
+            devices,
+            search,
+            extractors=[
+                lambda item: item.get("id"),
+                lambda item: item.get("name"),
+                lambda item: item.get("model"),
+                lambda item: item.get("manufacturer"),
+            ],
+        )
+        paged = paginate_items(devices, page=page, page_size=page_size, full_list=full_list)
+        logger.info(
+            f"Listed {len(paged['items'])} devices from Device Registry "
+            f"(page {paged['page']}/{paged['total_pages'] or 1}, total={paged['total']})"
+        )
         return {
             "success": True,
-            "count": len(devices),
-            "devices": devices
+            "count": len(paged["items"]),
+            "total": paged["total"],
+            "page": paged["page"],
+            "page_size": paged["page_size"],
+            "total_pages": paged["total_pages"],
+            "has_next": paged["has_next"],
+            "next_page": paged["next_page"],
+            "devices": paged["items"],
         }
     except Exception as e:
         logger.error(f"Failed to list Device Registry: {e}")

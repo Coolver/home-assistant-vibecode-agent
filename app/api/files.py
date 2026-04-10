@@ -8,6 +8,7 @@ import yaml
 from app.models.schemas import FileContent, FileAppend, Response
 from app.services.file_manager import file_manager
 from app.services.git_manager import git_manager
+from app.utils.pagination import paginate_items
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
@@ -123,7 +124,10 @@ def _validate_automations_structure(path: str, content: str) -> None:
 @router.get("/list")
 async def list_files(
     directory: str = Query("", description="Directory to list (relative to /config)"),
-    pattern: str = Query("*.yaml", description="File pattern (e.g., '*.yaml', '*.py')")
+    pattern: str = Query("*.yaml", description="File pattern (e.g., '*.yaml', '*.py')"),
+    page: int = Query(1, ge=1, description="Page number (1-based, default 1)"),
+    page_size: int = Query(250, ge=1, le=500, description="Items per page (default 250, max 500)"),
+    full_list: bool = Query(False, description="If true, return full list without pagination"),
 ):
     """
     List files in directory
@@ -135,11 +139,21 @@ async def list_files(
     """
     try:
         files = await file_manager.list_files(directory, pattern)
-        logger.info(f"Listed {len(files)} files in '{directory}' with pattern '{pattern}'")
+        paged = paginate_items(files, page=page, page_size=page_size, full_list=full_list)
+        logger.info(
+            f"Listed {len(paged['items'])} files in '{directory}' with pattern '{pattern}' "
+            f"(page {paged['page']}/{paged['total_pages'] or 1}, total={paged['total']})"
+        )
         return {
             "success": True,
-            "count": len(files),
-            "files": files
+            "count": len(paged["items"]),
+            "total": paged["total"],
+            "page": paged["page"],
+            "page_size": paged["page_size"],
+            "total_pages": paged["total_pages"],
+            "has_next": paged["has_next"],
+            "next_page": paged["next_page"],
+            "files": paged["items"],
         }
     except Exception as e:
         logger.error(f"Failed to list files: {e}")

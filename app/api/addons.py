@@ -1,5 +1,5 @@
 """Add-on Management API Endpoints"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import logging
@@ -7,6 +7,7 @@ import logging
 from app.models.schemas import Response
 from app.auth import verify_token
 from app.services.supervisor_client import get_supervisor_client
+from app.utils.pagination import filter_items_by_search, paginate_items
 
 logger = logging.getLogger('ha_cursor_agent')
 router = APIRouter()
@@ -24,7 +25,12 @@ class RepositoryRequest(BaseModel):
 # ==================== Endpoints ====================
 
 @router.get("/store", response_model=Response, dependencies=[Depends(verify_token)])
-async def list_store_addons():
+async def list_store_addons(
+    search: Optional[str] = Query(None, description="Case-insensitive substring search in add-on name, slug, description"),
+    page: int = Query(1, ge=1, description="Page number (1-based, default 1)"),
+    page_size: int = Query(250, ge=1, le=500, description="Items per page (default 250, max 500)"),
+    full_list: bool = Query(False, description="If true, return full list without pagination"),
+):
     """
     List ALL add-ons from add-on store (full catalog)
     
@@ -50,12 +56,24 @@ async def list_store_addons():
         else:
             addons = []
         
+        addons = filter_items_by_search(
+            addons,
+            search,
+            extractors=[lambda item: item.get("name"), lambda item: item.get("slug"), lambda item: item.get("description")],
+        )
+        paged = paginate_items(addons, page=page, page_size=page_size, full_list=full_list)
         return Response(
             success=True,
-            message=f"Found {len(addons)} add-ons in store catalog",
+            message=f"Found {paged['total']} add-ons in store catalog; returned {len(paged['items'])} on current page",
             data={
-                'count': len(addons),
-                'addons': addons
+                'count': len(paged["items"]),
+                'total': paged["total"],
+                'page': paged["page"],
+                'page_size': paged["page_size"],
+                'total_pages': paged["total_pages"],
+                'has_next': paged["has_next"],
+                'next_page': paged["next_page"],
+                'addons': paged["items"],
             }
         )
     except Exception as e:
@@ -63,7 +81,12 @@ async def list_store_addons():
         return Response(success=False, message=f"Failed to list store add-ons: {str(e)}")
 
 @router.get("/available", response_model=Response, dependencies=[Depends(verify_token)])
-async def list_available_addons():
+async def list_available_addons(
+    search: Optional[str] = Query(None, description="Case-insensitive substring search in add-on name, slug, description"),
+    page: int = Query(1, ge=1, description="Page number (1-based, default 1)"),
+    page_size: int = Query(250, ge=1, le=500, description="Items per page (default 250, max 500)"),
+    full_list: bool = Query(False, description="If true, return full list without pagination"),
+):
     """
     List all available add-ons (installed and available to install)
     
@@ -78,21 +101,34 @@ async def list_available_addons():
         
         addons = result.get('data', {}).get('addons', [])
         
+        addons = filter_items_by_search(
+            addons,
+            search,
+            extractors=[lambda item: item.get("name"), lambda item: item.get("slug"), lambda item: item.get("description")],
+        )
+        paged = paginate_items(addons, page=page, page_size=page_size, full_list=full_list)
+
         # Separate installed and available
         # An add-on is installed if it has a 'version' field (current installed version)
-        installed = [a for a in addons if a.get('version')]
-        available = [a for a in addons if not a.get('version')]
+        installed = [a for a in paged["items"] if a.get('version')]
+        available = [a for a in paged["items"] if not a.get('version')]
         
         return Response(
             success=True,
-            message=f"Found {len(addons)} add-ons ({len(installed)} installed, {len(available)} available)",
+            message=f"Found {paged['total']} add-ons ({len(installed)} installed, {len(available)} available on current page)",
             data={
-                'total': len(addons),
+                'count': len(paged["items"]),
+                'total': paged["total"],
+                'page': paged["page"],
+                'page_size': paged["page_size"],
+                'total_pages': paged["total_pages"],
+                'has_next': paged["has_next"],
+                'next_page': paged["next_page"],
                 'installed_count': len(installed),
                 'available_count': len(available),
                 'installed': installed,
                 'available': available,
-                'all': addons
+                'all': paged["items"],
             }
         )
     except Exception as e:
