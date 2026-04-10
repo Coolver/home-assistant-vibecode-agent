@@ -14,6 +14,33 @@ def _normalize_page_size(page_size: Optional[int]) -> int:
     return max(1, min(int(page_size), MAX_PAGE_SIZE))
 
 
+def _coerce_bool(value: Any, default: bool = False) -> bool:
+    """Treat only real bools as booleans; FastAPI Query(...) defaults are not bool."""
+    return value if isinstance(value, bool) else default
+
+
+def _coerce_int(value: Any, default: int) -> int:
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        return value
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _coerce_optional_int(value: Any, default: Optional[int]) -> Optional[int]:
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        return value
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _to_text(value: Any) -> str:
     if value is None:
         return ""
@@ -22,11 +49,13 @@ def _to_text(value: Any) -> str:
 
 def filter_items_by_search(
     items: Sequence[Any],
-    search: Optional[str],
+    search: Optional[Any],
     extractors: Iterable[Callable[[Any], Any]],
 ) -> List[Any]:
     """Filter items by case-insensitive substring across extracted values."""
-    if not search:
+    # When FastAPI route handlers are called directly (e.g. in tests), `Query(...)`
+    # defaults are not resolved — `search` may be a Query/ParameterInfo object, not str.
+    if not isinstance(search, str):
         return list(items)
 
     needle = search.strip().lower()
@@ -50,6 +79,9 @@ def paginate_items(
     full_list: bool = False,
 ) -> Dict[str, Any]:
     """Paginate a list and return slice with metadata."""
+    page = _coerce_int(page, 1)
+    full_list = _coerce_bool(full_list, False)
+    page_size = _coerce_optional_int(page_size, None)
     normalized_page = max(1, int(page))
     normalized_page_size = _normalize_page_size(page_size)
     total = len(items)

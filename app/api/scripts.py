@@ -11,7 +11,7 @@ from app.services.file_manager import file_manager
 from app.services.ha_client import ha_client
 from app.services.git_manager import git_manager
 from app.services.ha_websocket import get_ws_client
-from app.utils.pagination import filter_items_by_search, paginate_items
+from app.utils.pagination import _coerce_bool, filter_items_by_search, paginate_items
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
@@ -61,6 +61,7 @@ async def list_scripts(
     ```
     """
     try:
+        ids_only = _coerce_bool(ids_only, False)
         # Get all scripts from HA API (includes all sources: files, packages, UI)
         scripts = await ha_client.list_scripts()
         script_items = [{"id": script_id, "config": config} for script_id, config in scripts.items()]

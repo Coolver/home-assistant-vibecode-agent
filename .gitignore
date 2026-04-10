@@ -8,7 +8,9 @@ dist/
 build/
 .env
 .venv
+.venv*/
 venv/
+.pytest_cache/
 *.log
 .DS_Store
 .vscode/

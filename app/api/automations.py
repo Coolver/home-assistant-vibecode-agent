@@ -11,7 +11,7 @@ from app.services.file_manager import file_manager
 from app.services.ha_client import ha_client
 from app.services.git_manager import git_manager
 from app.services.ha_websocket import get_ws_client
-from app.utils.pagination import filter_items_by_search, paginate_items
+from app.utils.pagination import _coerce_bool, filter_items_by_search, paginate_items
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
@@ -63,6 +63,7 @@ async def list_automations(
     ```
     """
     try:
+        ids_only = _coerce_bool(ids_only, False)
         # Fast path: when only IDs are requested, use optimized ids_only mode in ha_client
         if ids_only:
             automation_ids = await ha_client.list_automations(ids_only=True)

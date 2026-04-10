@@ -1,6 +1,6 @@
 # 🧪 Home Assistant Agent - Comprehensive Test Suite
 
-**Version:** 2.10.42  
+**Version:** 2.10.43  
 **Purpose:** Complete testing of all HA Vibecode Agent MCP functions  
 **Usage:** Say "run Home Assistant Agent test suite" to run full suite
 
@@ -1279,5 +1279,5 @@ python -m unittest tests.test_structured_args_parsing -v
 
 **Last Updated:** 2026-01-27  
 **Test Suite Version:** 1.2.0  
-**Compatible with:** HA Vibecode Agent v2.10.42+
+**Compatible with:** HA Vibecode Agent v2.10.43+
 
