@@ -241,7 +241,7 @@ secrets.yaml
         This replaces the previous .gitignore-in-/config approach. We now
         explicitly filter which files we copy into the shadow repository:
         - Exclude known large / internal dirs: .storage, www, media, storage, tmp, etc.
-        - Exclude DB, log and backup files
+        - Exclude HA backup store, brand cache, DB, log and backup files
         - Exclude secrets and key/cert files
         - Exclude the agent's own shadow repo and any Git metadata
         """
@@ -255,8 +255,8 @@ secrets.yaml
 
         # Exclude well-known heavy / internal directories at top-level
         if is_dir:
-            if parts[0] in ('.storage', '.cloud', '.homeassistant',
-                            'www', 'media', 'storage', 'tmp',
+            if parts[0] in ('.storage', '.cloud', '.homeassistant', '.cache',
+                            'www', 'media', 'storage', 'tmp', 'backups',
                             'node_modules', '__pycache__'):
                 return False
             return True
@@ -286,8 +286,11 @@ secrets.yaml
             if fnmatch.fnmatch(filename, pattern) or fnmatch.fnmatch(rel_path, pattern):
                 return False
 
-        # Backup-like files
-        backup_patterns = ['*.bak', '*.backup', '*.old', '*.tmp', '*.temp', '*~']
+        # Backup-like files (incl. HA Automatic_backup_*.tar under /config/backups)
+        backup_patterns = [
+            '*.bak', '*.backup', '*.old', '*.tmp', '*.temp', '*~',
+            '*.tar', '*.tar.gz', '*.tgz',
+        ]
         for pattern in backup_patterns:
             if fnmatch.fnmatch(filename, pattern) or fnmatch.fnmatch(rel_path, pattern):
                 return False
@@ -295,7 +298,7 @@ secrets.yaml
         # Exclude files inside heavy/internal dirs (in case they weren't pruned as dirs)
         dir_prefix_patterns = [
             '.storage/', '.cloud/', '.homeassistant/',
-            'www/', 'media/', 'storage/', 'tmp/',
+            '.cache/', 'www/', 'media/', 'storage/', 'tmp/', 'backups/',
         ]
         for prefix in dir_prefix_patterns:
             if rel_path.startswith(prefix):
