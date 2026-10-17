@@ -1,6 +1,6 @@
 """Pydantic models for API"""
 import json
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, Dict, Any, List
 
 
@@ -53,8 +53,12 @@ class AutomationData(BaseModel):
 
     Accepts both HA legacy (trigger/condition/action) and modern
     (triggers/conditions/actions) field names. Plural forms are
-    normalized to singular during validation.
+    normalized to singular during validation. Keys the model does not
+    declare (max, max_exceeded, variables, trace, initial_state, ...)
+    are passed through to Home Assistant unchanged.
     """
+    model_config = ConfigDict(extra='allow')
+
     id: Optional[str] = None
     alias: str
     description: Optional[str] = None

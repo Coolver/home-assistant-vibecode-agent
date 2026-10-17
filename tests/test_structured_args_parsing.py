@@ -40,6 +40,27 @@ class StructuredArgsParsingTests(unittest.TestCase):
         self.assertEqual(automation.trigger[0]["entity_id"], "sensor.a")
         self.assertEqual(automation.action[0]["service"], "light.turn_on")
 
+    def test_automation_data_keeps_keys_outside_the_model(self):
+        automation = AutomationData(
+            alias="Test automation",
+            triggers=[{"trigger": "event", "event_type": "x"}],
+            actions=[{"action": "light.turn_on"}],
+            mode="parallel",
+            max=25,
+            max_exceeded="silent",
+            variables={"a": 1},
+            trace={"stored_traces": 10},
+            initial_state=False,
+        )
+        dumped = automation.model_dump(exclude_none=True)
+        self.assertEqual(dumped["max"], 25)
+        self.assertEqual(dumped["max_exceeded"], "silent")
+        self.assertEqual(dumped["variables"], {"a": 1})
+        self.assertEqual(dumped["trace"], {"stored_traces": 10})
+        self.assertIs(dumped["initial_state"], False)
+        self.assertNotIn("triggers", dumped)
+        self.assertNotIn("actions", dumped)
+
 
 if __name__ == "__main__":
     unittest.main()
