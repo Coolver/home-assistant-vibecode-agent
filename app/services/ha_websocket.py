@@ -498,8 +498,15 @@ class HAWebSocketClient:
         return result
 
     async def list_categories(self, scope: Optional[str] = None) -> list:
-        """List category registry entries. Filter by scope locally so older cores stay compatible."""
-        result = await self._send_message({'type': 'config/category_registry/list'})
+        """List category registry entries.
+
+        Current cores require `scope` on this command. When the caller names
+        one, it is sent through. The result is still filtered locally.
+        """
+        message = {'type': 'config/category_registry/list'}
+        if scope:
+            message['scope'] = scope
+        result = await self._send_message(message)
         categories = result if isinstance(result, list) else []
         if scope:
             categories = [item for item in categories if isinstance(item, dict) and item.get('scope') == scope]

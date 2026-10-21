@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.10.49] - 2026-10-22
+## [2.10.50] - 2026-10-22
 
 **Pair with MCP client 3.2.32.**
 

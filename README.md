@@ -1,6 +1,6 @@
 # HA Vibecode Agent
 
-[![Version](https://img.shields.io/badge/version-2.10.49-blue.svg)](https://github.com/Coolver/home-assistant-vibecode-agent)
+[![Version](https://img.shields.io/badge/version-2.10.50-blue.svg)](https://github.com/Coolver/home-assistant-vibecode-agent)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![MCP Package](https://img.shields.io/npm/v/@coolver/home-assistant-mcp?label=MCP%20Package)](https://www.npmjs.com/package/@coolver/home-assistant-mcp)
 [![Landing Page](https://img.shields.io/badge/Landing%20Page-coolver.github.io-blueviolet)](https://coolver.github.io/home-assistant-vibecode-agent/)
@@ -30,7 +30,7 @@ https://github.com/user-attachments/assets/0df48019-06c0-48dd-82ad-c7fe0734ddb3
 **Full YouTube Demo:**
 - [How to control Home Assistant from Cursor](https://youtu.be/xocbWonWdoc)
 
-## What's new in 2.10.49
+## What's new in 2.10.50
 
 This one is mostly thanks to people who sent pull requests and wrote issues. Pair it with MCP client **3.2.32**.
 

@@ -74,7 +74,7 @@ def test_call_service_leaves_ordinary_calls_unchanged():
     assert "return_response" not in sent
 
 
-def test_list_categories_filters_scope_without_sending_it():
+def test_list_categories_sends_scope_and_filters():
     client = responding_client({"success": True, "result": [
         {"category_id": "a", "scope": "automation", "name": "Lights"},
         {"category_id": "s", "scope": "script", "name": "House"},
@@ -85,7 +85,7 @@ def test_list_categories_filters_scope_without_sending_it():
     assert [item["category_id"] for item in listed] == ["a"]
     sent = client.ws.send_json.call_args.args[0]
     assert sent["type"] == "config/category_registry/list"
-    assert "scope" not in sent
+    assert sent["scope"] == "automation"
 
 
 @pytest.mark.parametrize("result", [None, [], {}, {"success": False, "error": "Application payload"}])
