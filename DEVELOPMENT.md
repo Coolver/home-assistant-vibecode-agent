@@ -587,6 +587,18 @@ The add-on automatically uses the **Supervisor Token** for Home Assistant API op
    - Pydantic schemas for request/response validation
    - Data models
 
+### WebSocket command results
+
+Home Assistant reports command status in the outer WebSocket response's
+`success` and `error` fields. The client raises rejected commands to the calling
+API endpoint; a successful `result` payload is returned unchanged, including
+`null` results. See the [Home Assistant WebSocket protocol](https://contributors.home-assistant.io/core/internals/websocket-api/#results-and-errors).
+
+For `POST /api/registries/entities/update`, keep using the `disabled` boolean:
+`true` maps to Home Assistant's `disabled_by: "user"`, and `false` maps to
+`disabled_by: null`. Omitting it leaves the current disabled state unchanged.
+The HTTP response's `updated_fields` continues to use `disabled`.
+
 ### Key Design Decisions
 
 - **Separation of Concerns**: API endpoints are thin, business logic in services

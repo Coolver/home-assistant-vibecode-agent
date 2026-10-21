@@ -198,16 +198,19 @@ class HAWebSocketClient:
             future = self.pending_requests.pop(msg_id)
             if not future.done():
                 if msg_type == 'result':
-                    result = data.get('result')
-                    # Check for errors in result
-                    if isinstance(result, dict) and result.get('success') is False:
-                        error = result.get('error', {})
-                        error_code = error.get('code', 'unknown_error')
-                        error_message = error.get('message', str(error)) if isinstance(error, dict) else str(error)
+                    # Command status belongs to the envelope; result is application data.
+                    if data.get('success') is False:
+                        error = data.get('error', {})
+                        if isinstance(error, dict):
+                            error_code = error.get('code', 'unknown_error')
+                            error_message = error.get('message', str(error))
+                        else:
+                            error_code = 'unknown_error'
+                            error_message = str(error)
                         logger.error(f"WebSocket command failed: {error_code} - {error_message}")
                         future.set_exception(Exception(f"WebSocket error: {error_code} - {error_message}"))
                     else:
-                        future.set_result(result)
+                        future.set_result(data.get('result'))
                 else:
                     future.set_result(data)
         
@@ -460,6 +463,8 @@ class HAWebSocketClient:
         Returns:
             Update result
         """
+        if 'disabled' in kwargs:
+            kwargs['disabled_by'] = 'user' if kwargs.pop('disabled') else None
         message = {
             'type': 'config/entity_registry/update',
             'entity_id': entity_id,
