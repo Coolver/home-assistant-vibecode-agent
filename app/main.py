@@ -9,7 +9,6 @@ import secrets
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Depends, Security, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 
 from app.api import files, entities, helpers, automations, scripts, system, backup, logs, logbook, ai_instructions, hacs, addons, lovelace, themes, registries, history, blueprints, calendar, zones, snapshot
@@ -38,19 +37,12 @@ app = FastAPI(
 )
 
 # CORS
-# Note:
+# No CORS middleware on purpose:
 # - MCP clients (Cursor, VS Code, Codex, Claude Code, etc.) talk to the agent as
 #   regular HTTP clients and are NOT affected by CORS (CORS is a browser concern).
-# - We still keep a permissive configuration here for backwards compatibility,
-#   but the critical security issue is addressed by requiring authentication for
-#   API key regeneration (see /api/regenerate-key below).
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# - The Ingress panel is served same-origin through Home Assistant.
+# - A wildcard policy let any web page opened on the LAN read the setup panel
+#   (and with it the API key) from port 8099 (issue #50).
 
 # Track MCP client versions (to avoid logging on every request) — bounded to prevent memory leak
 _MCP_CLIENTS_MAX = 256
@@ -86,6 +78,27 @@ elif HA_TOKEN:
     RUNTIME_MODE = "standalone"
 else:
     RUNTIME_MODE = "dev"
+
+# Home Assistant Supervisor proxies Ingress requests from this fixed address.
+# Direct hits on the published port (8099) come from the client's own address.
+SUPERVISOR_INGRESS_IP = "172.30.32.2"
+
+INGRESS_ONLY_HTML = """<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>HA Vibecode Agent</title></head>
+<body style="font-family: sans-serif; padding: 2em;">
+<h1>Open this page from Home Assistant</h1>
+<p>The setup panel shows your Agent Key, so it is only available through Home Assistant:
+open the HA Vibecode Agent app and choose <strong>Open Web UI</strong>.</p>
+</body></html>"""
+
+
+def is_panel_request_allowed(request: Request) -> bool:
+    """The setup panel embeds the API key. Under Supervisor, serve it only through
+    authenticated HA Ingress, never on the published port (issue #50)."""
+    if RUNTIME_MODE != "supervisor":
+        return True
+    return request.client is not None and request.client.host == SUPERVISOR_INGRESS_IP
+
 
 # API Key configuration
 API_KEY_FROM_CONFIG = os.getenv('API_KEY', '').strip()
@@ -240,8 +253,10 @@ app.include_router(ai_instructions.router, prefix="/api/ai")
 
 
 @app.get("/", response_class=HTMLResponse)
-async def ingress_panel():
+async def ingress_panel(request: Request):
     """Ingress panel - shows ready-to-use JSON config"""
+    if not is_panel_request_allowed(request):
+        return HTMLResponse(INGRESS_ONLY_HTML, status_code=403)
     return generate_ingress_html(API_KEY, AGENT_VERSION)
 
 
@@ -291,8 +306,10 @@ async def regenerate_api_key():
 
 
 @app.get("/old", response_class=HTMLResponse)
-async def old_ingress_panel():
+async def old_ingress_panel(request: Request):
     """Old ingress panel (deprecated)"""
+    if not is_panel_request_allowed(request):
+        return HTMLResponse(INGRESS_ONLY_HTML, status_code=403)
     
     # Mask API key for display (show first 8 and last 8 chars)
     masked_key = f"{API_KEY[:8]}...{API_KEY[-8:]}" if len(API_KEY) > 16 else API_KEY

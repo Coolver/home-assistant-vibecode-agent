@@ -276,7 +276,8 @@ class SupervisorClient:
         Returns:
             Update result
         """
-        logger.info(f"Configuring add-on {slug}: {options}")
+        # Option values often hold passwords; log only which keys are set.
+        logger.info(f"Configuring add-on {slug}: options {sorted(options)}")
         return await self._request('POST', f'addons/{slug}/options', data={'options': options})
     
     # ==================== Store & Repositories ====================
