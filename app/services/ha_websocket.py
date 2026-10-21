@@ -199,9 +199,15 @@ class HAWebSocketClient:
             if not future.done():
                 if msg_type == 'result':
                     result = data.get('result')
-                    # Check for errors in result
-                    if isinstance(result, dict) and result.get('success') is False:
-                        error = result.get('error', {})
+                    # HA reports failure at the top level of the message
+                    # ({"type": "result", "success": false, "error": {...}}); the
+                    # nested check is kept for commands that embed it in the result.
+                    failed = data.get('success') is False
+                    if not failed and isinstance(result, dict) and result.get('success') is False:
+                        failed = True
+                        data = result
+                    if failed:
+                        error = data.get('error', {})
                         error_code = error.get('code', 'unknown_error')
                         error_message = error.get('message', str(error)) if isinstance(error, dict) else str(error)
                         logger.error(f"WebSocket command failed: {error_code} - {error_message}")

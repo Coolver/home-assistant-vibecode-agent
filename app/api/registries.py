@@ -223,6 +223,7 @@ async def update_entity_registry(
     name: Optional[str] = Body(None, description="New friendly name. Pass empty string '' to reset to original name."),
     area_id: Optional[str] = Body(None, description="Area ID to assign entity to"),
     disabled: Optional[bool] = Body(None, description="Disable/enable entity"),
+    hidden: Optional[bool] = Body(None, description="Hide/unhide entity (hidden entities are left out of dashboards and voice assistants)"),
     new_entity_id: Optional[str] = Body(None, description="New entity_id (rename)"),
     icon: Optional[str] = Body(None, description="Icon for entity"),
     aliases: Optional[Any] = Body(None, description="Aliases for entity")
@@ -260,7 +261,9 @@ async def update_entity_registry(
         if area_id is not None:
             update_data['area_id'] = area_id
         if disabled is not None:
-            update_data['disabled'] = disabled
+            update_data['disabled_by'] = 'user' if disabled else None
+        if hidden is not None:
+            update_data['hidden_by'] = 'user' if hidden else None
         if new_entity_id is not None:
             update_data['new_entity_id'] = new_entity_id
         if icon is not None:

@@ -12,7 +12,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 
-from app.api import files, entities, helpers, automations, scripts, system, backup, logs, logbook, ai_instructions, hacs, addons, lovelace, themes, registries, history, blueprints, calendar, zones, snapshot
+from app.api import files, entities, helpers, automations, scripts, system, backup, logs, logbook, ai_instructions, hacs, addons, lovelace, themes, registries, history, blueprints, calendar, zones, snapshot, config_entries
 from app.utils.logger import setup_logger
 from app.ingress_panel import generate_ingress_html
 from app.services import ha_websocket
@@ -231,6 +231,7 @@ app.include_router(addons.router, prefix="/api/addons", tags=["Add-ons"])
 app.include_router(lovelace.router, prefix="/api/lovelace", tags=["Lovelace"], dependencies=[Depends(verify_token)])
 app.include_router(themes.router, prefix="/api/themes", tags=["Themes"], dependencies=[Depends(verify_token)])
 app.include_router(registries.router, prefix="/api/registries", tags=["Registries"], dependencies=[Depends(verify_token)])
+app.include_router(config_entries.router, prefix="/api/config_entries", tags=["Config entries"], dependencies=[Depends(verify_token)])
 app.include_router(history.router, prefix="/api/history", tags=["History"], dependencies=[Depends(verify_token)])
 app.include_router(blueprints.router, prefix="/api/blueprints", tags=["Blueprints"], dependencies=[Depends(verify_token)])
 app.include_router(calendar.router, prefix="/api/calendar", tags=["Calendar"], dependencies=[Depends(verify_token)])
