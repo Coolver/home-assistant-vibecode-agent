@@ -269,7 +269,14 @@ class HAWebSocketClient:
             self.pending_requests.pop(msg_id, None)
             raise
     
-    async def call_service(self, domain: str, service: str, service_data: dict = None, target: dict = None) -> Any:
+    async def call_service(
+        self,
+        domain: str,
+        service: str,
+        service_data: dict = None,
+        target: dict = None,
+        return_response: bool = False,
+    ) -> Any:
         """
         Call Home Assistant service via WebSocket
         
@@ -278,6 +285,9 @@ class HAWebSocketClient:
             service: Service name (e.g., 'turn_on', 'download')
             service_data: Service data
             target: Target entities
+            return_response: Ask Home Assistant to include the service's
+                return value. Required for services that only run when the
+                caller accepts a response.
             
         Returns:
             Service response
@@ -293,10 +303,21 @@ class HAWebSocketClient:
         
         if target:
             message['target'] = target
+
+        if return_response:
+            message['return_response'] = True
         
         result = await self._send_message(message)
         logger.info(f"Called service: {domain}.{service}")
         return result
+
+    async def remove_hacs_repository(self, repository_id: str) -> dict:
+        """Remove one installed HACS repository. `repository_id` is HACS's own id, not the GitHub full name."""
+        result = await self._send_message({
+            'type': 'hacs/repository/remove',
+            'repository': str(repository_id),
+        })
+        return result if isinstance(result, dict) else {}
     
     async def get_states(self) -> list:
         """
@@ -465,6 +486,8 @@ class HAWebSocketClient:
         """
         if 'disabled' in kwargs:
             kwargs['disabled_by'] = 'user' if kwargs.pop('disabled') else None
+        if 'hidden' in kwargs:
+            kwargs['hidden_by'] = 'user' if kwargs.pop('hidden') else None
         message = {
             'type': 'config/entity_registry/update',
             'entity_id': entity_id,
@@ -473,6 +496,46 @@ class HAWebSocketClient:
         result = await self._send_message(message)
         logger.info(f"Updated entity registry: {entity_id}")
         return result
+
+    async def list_categories(self, scope: Optional[str] = None) -> list:
+        """List category registry entries. Filter by scope locally so older cores stay compatible."""
+        result = await self._send_message({'type': 'config/category_registry/list'})
+        categories = result if isinstance(result, list) else []
+        if scope:
+            categories = [item for item in categories if isinstance(item, dict) and item.get('scope') == scope]
+        return categories
+
+    async def create_category(self, scope: str, name: str, icon: Optional[str] = None) -> dict:
+        """Create a category in one scope (automation, script, helpers, ...)."""
+        message = {
+            'type': 'config/category_registry/create',
+            'scope': scope,
+            'name': name,
+        }
+        if icon is not None:
+            message['icon'] = icon
+        result = await self._send_message(message)
+        return result or {}
+
+    async def update_category(
+        self,
+        scope: str,
+        category_id: str,
+        name: Optional[str] = None,
+        icon: Optional[str] = None,
+    ) -> dict:
+        """Update a category's name or icon."""
+        message = {
+            'type': 'config/category_registry/update',
+            'scope': scope,
+            'category_id': category_id,
+        }
+        if name is not None:
+            message['name'] = name
+        if icon is not None:
+            message['icon'] = icon
+        result = await self._send_message(message)
+        return result or {}
     
     async def remove_entity_registry_entry(self, entity_id: str) -> dict:
         """

@@ -27,6 +27,44 @@ def _parse_aliases(value: Any) -> Optional[List[str]]:
         raise HTTPException(status_code=422, detail="aliases must be an array of strings")
     return parsed
 
+
+def _parse_string_list(value: Any, field: str) -> Optional[List[str]]:
+    """Parse a list of strings from a list or a JSON string."""
+    if value is None:
+        return None
+    parsed = value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=422, detail=f"Invalid {field} JSON string") from exc
+    if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
+        raise HTTPException(status_code=422, detail=f"{field} must be an array of strings")
+    return parsed
+
+
+def _parse_categories(value: Any) -> Optional[Dict[str, Optional[str]]]:
+    """Parse scope → category_id. A null value clears that scope."""
+    if value is None:
+        return None
+    parsed = value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=422, detail="Invalid categories JSON string") from exc
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=422, detail="categories must be an object of scope to category_id")
+    cleaned: Dict[str, Optional[str]] = {}
+    for scope, category_id in parsed.items():
+        if not isinstance(scope, str) or not (category_id is None or isinstance(category_id, str)):
+            raise HTTPException(
+                status_code=422,
+                detail="categories values must be a category_id string or null",
+            )
+        cleaned[scope] = category_id
+    return cleaned
+
 # ==================== Entity Registry ====================
 
 @router.get("/entities/list")
@@ -223,9 +261,12 @@ async def update_entity_registry(
     name: Optional[str] = Body(None, description="New friendly name. Pass empty string '' to reset to original name."),
     area_id: Optional[str] = Body(None, description="Area ID to assign entity to"),
     disabled: Optional[bool] = Body(None, description="Disable/enable entity"),
+    hidden: Optional[bool] = Body(None, description="Hide/unhide entity (hidden entities are left out of dashboards and voice assistants)"),
     new_entity_id: Optional[str] = Body(None, description="New entity_id (rename)"),
     icon: Optional[str] = Body(None, description="Icon for entity"),
-    aliases: Optional[Any] = Body(None, description="Aliases for entity")
+    aliases: Optional[Any] = Body(None, description="Aliases for entity"),
+    labels: Optional[Any] = Body(None, description="Label ids. Replaces the entity's full label set. Pass [] to clear."),
+    categories: Optional[Any] = Body(None, description="Map of scope to category_id, e.g. {\"automation\": \"<id>\"}. Only the scopes you send are changed. Null clears that scope."),
 ):
     """
     Update entity in Entity Registry
@@ -261,12 +302,18 @@ async def update_entity_registry(
             update_data['area_id'] = area_id
         if disabled is not None:
             update_data['disabled'] = disabled
+        if hidden is not None:
+            update_data['hidden'] = hidden
         if new_entity_id is not None:
             update_data['new_entity_id'] = new_entity_id
         if icon is not None:
             update_data['icon'] = icon
         if aliases is not None:
             update_data['aliases'] = _parse_aliases(aliases)
+        if labels is not None:
+            update_data['labels'] = _parse_string_list(labels, "labels")
+        if categories is not None:
+            update_data['categories'] = _parse_categories(categories)
         
         if not update_data:
             raise HTTPException(status_code=400, detail="No fields provided for update")
@@ -740,5 +787,65 @@ async def remove_device_registry_entry(request: DeviceRemoveRequest):
     except Exception as e:
         logger.error(f"Failed to remove Device Registry entry: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to remove Device Registry entry: {str(e)}")
+
+
+# ==================== Category Registry ====================
+
+@router.get("/categories/list")
+async def list_categories(
+    scope: Optional[str] = Query(None, description="Filter by scope: automation, script, helpers, or another Home Assistant category scope"),
+):
+    """
+    List categories from the Home Assistant category registry.
+
+    Use the returned `category_id` with `POST /api/registries/entities/update`
+    (`categories`) or you will be inventing an id the UI does not have.
+    """
+    try:
+        ws_client = await get_ws_client()
+        categories = await ws_client.list_categories(scope)
+        return {"success": True, "count": len(categories), "categories": categories}
+    except Exception as e:
+        logger.error(f"Failed to list categories: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list categories: {str(e)}")
+
+
+@router.post("/categories/create")
+async def create_category(
+    scope: str = Body(..., embed=True, description="Category scope, e.g. automation, script, helpers"),
+    name: str = Body(..., embed=True, description="Display name"),
+    icon: Optional[str] = Body(None, embed=True, description="Optional mdi icon"),
+):
+    """Create a category. Returns the new category, including its category_id."""
+    try:
+        ws_client = await get_ws_client()
+        result = await ws_client.create_category(scope, name, icon)
+        logger.info(f"Created category {name!r} in scope {scope}")
+        return {"success": True, "category": result}
+    except Exception as e:
+        logger.error(f"Failed to create category: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create category: {str(e)}")
+
+
+@router.post("/categories/update")
+async def update_category(
+    scope: str = Body(..., embed=True, description="Category scope"),
+    category_id: str = Body(..., embed=True, description="Category id from /categories/list"),
+    name: Optional[str] = Body(None, embed=True, description="New display name"),
+    icon: Optional[str] = Body(None, embed=True, description="New mdi icon"),
+):
+    """Rename a category or change its icon."""
+    if name is None and icon is None:
+        raise HTTPException(status_code=400, detail="Provide name or icon")
+    try:
+        ws_client = await get_ws_client()
+        result = await ws_client.update_category(scope, category_id, name, icon)
+        logger.info(f"Updated category {category_id} in scope {scope}")
+        return {"success": True, "category": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update category: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update category: {str(e)}")
 
 

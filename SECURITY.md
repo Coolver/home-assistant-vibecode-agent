@@ -36,7 +36,7 @@ We will acknowledge receipt within 48 hours and provide a timeline for a fix.
 ### Network
 - The agent listens on a single port (default 8099)
 - No outbound connections except to Home Assistant APIs
-- CORS is permissive by design (MCP clients are not browsers)
+- The setup panel is served only through Home Assistant Ingress. The API does not send a wildcard CORS header
 
 ### Git Versioning
 - Shadow git repository isolates versioning from user config
@@ -45,9 +45,9 @@ We will acknowledge receipt within 48 hours and provide a timeline for a fix.
 
 ## Known Limitations
 
-- The agent has full read/write access to `/config` — this is by design for its functionality
+- The agent can read and write `/config`, except credential files (`secrets.yaml`, key and certificate files, and Home Assistant auth/config-entry storage). Set the add-on option `allow_sensitive_files` to allow those too
 - Service calls can affect physical devices — always review AI actions before confirming
 - The MCP package runs with `npx` which downloads from npm — pin the version for production use:
   ```
-  npx -y @coolver/home-assistant-mcp@3.2.27
+  npx -y @coolver/home-assistant-mcp@3.2.32
   ```

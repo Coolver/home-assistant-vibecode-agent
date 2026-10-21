@@ -71,9 +71,11 @@ Before ANY modifications, you MUST:
    ```
    ha_end_checkpoint()
    ```
-   This re-enables auto-commits for future requests.
+   This commits anything still waiting and closes the checkpoint.
 
-**Note:** During request processing, auto-commits are disabled, so all changes will be in one commit at the end (if needed).
+**Note:** Each write is committed when it happens, including while a checkpoint is open. `ha_end_checkpoint` saves whatever is still uncommitted. Forgetting either call does not drop the edit.
+
+Do not read or write `secrets.yaml`, key or certificate files, or Home Assistant credential storage (`.storage/core.config_entries`, `.storage/auth*`, `.storage/http*`, `.storage/cloud`, `.storage/application_credentials`). The file API refuses them. Other `.storage` files, including dashboards, stay readable.
 
 Before ANY write operation (if checkpoint was not created):
 

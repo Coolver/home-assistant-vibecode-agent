@@ -253,6 +253,7 @@ async def call_service(
     data_alias: Optional[Any] = Body(None, alias="data", description="Backward-compatible alias for service_data"),
     wait_for_state: Optional[str] = Body(None, description="If set, poll the target entity until it reaches this state (e.g., 'on', 'off', '21.0')"),
     wait_timeout: float = Body(10.0, description="Max seconds to wait for state change (default 10). Only used with wait_for_state."),
+    return_response: bool = Body(False, description="Ask Home Assistant for the service's return value. Needed for weather.get_forecasts, calendar.get_events, todo.get_items, and any service that refuses a caller that does not accept a response."),
 ):
     """
     Call a Home Assistant service
@@ -285,7 +286,21 @@ async def call_service(
             if not any(k in data for k in ['entity_id', 'area_id', 'device_id']):
                 data['target'] = target
         
-        result = await ha_client.call_service(domain, service, data)
+        if return_response:
+            # The REST service API drops the return value, and Home Assistant
+            # refuses services that require a response consumer. The WebSocket
+            # command is the one the UI uses for those.
+            from app.services.ha_websocket import get_ws_client
+            ws_client = await get_ws_client()
+            result = await ws_client.call_service(
+                domain,
+                service,
+                service_data=service_data or None,
+                target=target or None,
+                return_response=True,
+            )
+        else:
+            result = await ha_client.call_service(domain, service, data)
         logger.info(f"Service called: {domain}.{service}")
 
         response = {
@@ -295,6 +310,8 @@ async def call_service(
             "data": data,
             "result": result
         }
+        if return_response:
+            response["response"] = result.get("response") if isinstance(result, dict) else None
 
         # Poll for expected state if requested
         if wait_for_state and data.get('entity_id'):

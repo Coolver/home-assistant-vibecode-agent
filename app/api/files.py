@@ -6,12 +6,23 @@ import os
 import yaml
 
 from app.models.schemas import FileContent, FileAppend, Response
-from app.services.file_manager import file_manager
+from app.services.file_manager import SensitivePathError, file_manager
 from app.services.git_manager import git_manager
 from app.utils.pagination import paginate_items
 
 router = APIRouter()
 logger = logging.getLogger('ha_cursor_agent')
+
+
+def _raise_file_error(exc: Exception, action: str) -> None:
+    if isinstance(exc, HTTPException):
+        raise exc
+    if isinstance(exc, SensitivePathError):
+        raise HTTPException(status_code=403, detail=str(exc))
+    logger.error(f"{action}: {exc}")
+    if isinstance(exc, FileNotFoundError):
+        raise HTTPException(status_code=404, detail=str(exc))
+    raise HTTPException(status_code=500, detail=str(exc))
 
 
 def _is_yaml_path(path: str) -> bool:
@@ -156,8 +167,7 @@ async def list_files(
             "files": paged["items"],
         }
     except Exception as e:
-        logger.error(f"Failed to list files: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_file_error(e, "Failed to list files")
 
 @router.get("/read")
 async def read_file(path: str = Query(..., description="File path relative to /config")):
@@ -176,11 +186,8 @@ async def read_file(path: str = Query(..., description="File path relative to /c
             "content": content,
             "size": len(content)
         }
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
     except Exception as e:
-        logger.error(f"Failed to read file: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_file_error(e, "Failed to read file")
 
 @router.post("/write", response_model=Response)
 async def write_file(file_data: FileContent):
@@ -225,8 +232,7 @@ async def write_file(file_data: FileContent):
         
         return Response(success=True, message=f"File written: {file_data.path}", data=result)
     except Exception as e:
-        logger.error(f"Failed to write file: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_file_error(e, "Failed to write file")
 
 @router.post("/append", response_model=Response)
 async def append_to_file(file_data: FileAppend):
@@ -265,7 +271,7 @@ async def append_to_file(file_data: FileAppend):
             commit_msg = file_data.commit_message or f"Append to file: {file_data.path}"
             commit = await git_manager.commit_changes(
                 commit_msg,
-                skip_if_processing=True
+                skip_if_processing=False
             )
             if commit:
                 result['git_commit'] = commit
@@ -274,8 +280,7 @@ async def append_to_file(file_data: FileAppend):
         
         return Response(success=True, message=f"Content appended to: {file_data.path}", data=result)
     except Exception as e:
-        logger.error(f"Failed to append to file: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_file_error(e, "Failed to append to file")
 
 @router.delete("/delete")
 async def delete_file(path: str = Query(..., description="File path to delete")):
@@ -287,11 +292,8 @@ async def delete_file(path: str = Query(..., description="File path to delete"))
     try:
         result = await file_manager.delete_file(path)
         return Response(success=True, message=f"File deleted: {path}", data=result)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"File not found: {path}")
     except Exception as e:
-        logger.error(f"Failed to delete file: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_file_error(e, "Failed to delete file")
 
 @router.get("/parse_yaml")
 async def parse_yaml(path: str = Query(..., description="YAML file path")):
@@ -307,6 +309,8 @@ async def parse_yaml(path: str = Query(..., description="YAML file path")):
             "path": path,
             "data": data
         }
+    except SensitivePathError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid YAML: {e}")
     except FileNotFoundError:

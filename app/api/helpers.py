@@ -282,7 +282,7 @@ async def create_helper(helper: HelperCreate):
             commit_msg = helper.commit_message or f"Create helper: {full_entity_id} - {helper_name}"
             await git_manager.commit_changes(
                 commit_msg,
-                skip_if_processing=True
+                skip_if_processing=False
             )
         
         logger.info(f"Created helper: {full_entity_id} - {helper_name}")
@@ -561,7 +561,7 @@ async def delete_helper(entity_id: str, commit_message: Optional[str] = Query(No
             commit_msg = commit_message or f"Delete helper: {entity_id}"
             await git_manager.commit_changes(
                 commit_msg,
-                skip_if_processing=True
+                skip_if_processing=False
             )
         
         method_used = []

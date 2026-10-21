@@ -30,7 +30,11 @@ class GitManager:
         self.max_backups = int(os.getenv('MAX_BACKUPS', '30'))
         logger.info(f"GitManager initialized: max_backups={self.max_backups}, auto={self.git_versioning_auto}")
         self.repo = None
-        self.processing_request = False  # Flag to disable auto-commits during request processing
+        # While a checkpoint is open, skip the extra "backup before" commit.
+        # The change itself is still committed. Forgetting ha_end_checkpoint
+        # must not leave later edits out of git.
+        self.processing_request = False
+        self.checkpoint_request: Optional[str] = None
         self._git_lock = asyncio.Lock()  # Prevent concurrent git operations
         
         # Always initialize shadow repo (Git is always enabled)
@@ -624,7 +628,9 @@ secrets.yaml
                     logger.warning(f"Failed to create tag: {e}")
                     tag = None
             
-            # Set flag to disable auto-commits during request processing
+            # Open checkpoint. Pre-change backups are skipped while this is set;
+            # the edits themselves are still committed.
+            self.checkpoint_request = user_request
             self.processing_request = True
             
             return {
@@ -643,10 +649,27 @@ secrets.yaml
                 "tag": None
             }
     
-    def end_request_processing(self):
-        """End request processing - re-enable auto-commits"""
+    async def end_checkpoint(self) -> Optional[str]:
+        """Commit anything still pending, then close the checkpoint.
+
+        Opening a checkpoint used to suppress every auto-commit until this
+        was called, and this call did not commit. Edits made in between
+        never became a git commit if the caller forgot the closing step.
+        """
+        message = None
+        if self.checkpoint_request:
+            message = f"Changes: {self.checkpoint_request}"
+        commit_hash = None
+        if self.repo:
+            commit_hash = await self.commit_changes(
+                message,
+                skip_if_processing=False,
+                force=True,
+            )
         self.processing_request = False
-        logger.debug("Request processing ended - auto-commits re-enabled")
+        self.checkpoint_request = None
+        logger.info("Request processing ended - pending changes committed, auto-commits re-enabled")
+        return commit_hash
     
     def _check_git_filter_repo_available(self) -> bool:
         """Check if git filter-repo is available in the system"""

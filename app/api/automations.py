@@ -354,8 +354,7 @@ async def _export_automations_to_git(commit_message: str):
         commit_message: Git commit message for this export
     """
     try:
-        if not git_manager.git_versioning_auto or git_manager.processing_request:
-            # Git versioning disabled or during request processing, skip export
+        if not git_manager.git_versioning_auto:
             return
         
         if not git_manager.repo:
@@ -459,7 +458,7 @@ async def _export_automations_to_git(commit_message: str):
         # Add to Git and commit
         try:
             git_manager.repo.git.add(str(export_dir))
-            if git_manager.git_versioning_auto and not git_manager.processing_request:
+            if git_manager.git_versioning_auto:
                 git_manager.repo.index.commit(commit_message)
                 logger.info(f"Exported {exported_count} automations to Git: {commit_message}")
         except Exception as git_error:

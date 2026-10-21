@@ -33,6 +33,60 @@ logger = logging.getLogger('ha_cursor_agent')
 
 HACS_GITHUB_REPO = "hacs/integration"
 HACS_INSTALL_PATH = "/config/custom_components/hacs"
+HACS_REPOSITORIES_PATH = "/config/.storage/hacs.repositories"
+
+
+def _load_hacs_repository_index() -> dict:
+    """Read HACS's repository catalog. Keys are HACS repository ids."""
+    path = Path(HACS_REPOSITORIES_PATH)
+    if not path.exists():
+        return {}
+    import json
+    with path.open("r", encoding="utf-8") as handle:
+        storage = json.load(handle)
+
+    data = storage.get("data", {})
+    if isinstance(data, dict) and any(isinstance(item, dict) and "full_name" in item for item in data.values()):
+        return data
+    if isinstance(data, dict):
+        nested = data.get("repositories")
+        if isinstance(nested, dict):
+            return nested
+    repositories = storage.get("repositories")
+    return repositories if isinstance(repositories, dict) else {}
+
+
+def _resolve_hacs_repository(repository: str) -> tuple:
+    """Match a GitHub full name or a HACS repository id to one catalog entry."""
+    records = _load_hacs_repository_index()
+    if repository in records and isinstance(records[repository], dict):
+        return repository, records[repository]
+
+    exact = [
+        (repo_id, info)
+        for repo_id, info in records.items()
+        if isinstance(info, dict) and info.get("full_name") == repository
+    ]
+    if len(exact) == 1:
+        return exact[0]
+    if len(exact) > 1:
+        raise HTTPException(
+            status_code=409,
+            detail=f"More than one HACS entry is named {repository}. Pass the repository_id from /api/hacs/repositories.",
+        )
+
+    lowered = repository.lower()
+    folded = [
+        (repo_id, info)
+        for repo_id, info in records.items()
+        if isinstance(info, dict) and str(info.get("full_name", "")).lower() == lowered
+    ]
+    if len(folded) == 1:
+        return folded[0]
+    raise HTTPException(
+        status_code=404,
+        detail=f"HACS repository not found: {repository}. List them with /api/hacs/repositories and pass the full name or repository_id.",
+    )
 
 
 @router.post("/install", response_model=Response, dependencies=[Depends(verify_token)])
@@ -477,6 +531,8 @@ async def install_hacs_repository(
             }
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Failed to install HACS repository: {error_msg}")
@@ -494,6 +550,70 @@ async def install_hacs_repository(
             )
         else:
             raise HTTPException(status_code=500, detail=error_msg)
+
+
+@router.post("/remove_repository", response_model=Response, dependencies=[Depends(verify_token)])
+async def remove_hacs_repository(
+    repository: Optional[str] = Body(None, embed=True, description="GitHub full name (author/name) or the HACS repository_id"),
+):
+    """
+    Remove one installed HACS repository.
+
+    This is the HACS Remove button: HACS deletes the downloaded files and, for a
+    dashboard card, its Lovelace resource. It does not uninstall HACS, and it
+    does not delete an integration's config entry.
+    """
+    repository = (repository or "").strip()
+    if not repository:
+        raise HTTPException(status_code=422, detail="Field required: repository")
+
+    if not Path(HACS_INSTALL_PATH).exists():
+        raise HTTPException(
+            status_code=400,
+            detail="HACS is not installed. Please install HACS first using /api/hacs/install",
+        )
+
+    repository_id, info = _resolve_hacs_repository(repository)
+    full_name = info.get("full_name") or repository
+    installed = info.get("installed") or info.get("version_installed") or info.get("installed_version")
+    if not installed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{full_name} is in the HACS catalog but not installed, so there is nothing to remove.",
+        )
+
+    try:
+        ws_client = await get_ws_client()
+        await ws_client.remove_hacs_repository(repository_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Failed to remove HACS repository {full_name}: {error_msg}")
+        if "not connected" in error_msg.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="WebSocket not connected. Agent may still be starting up. Wait a few seconds and try again.",
+            )
+        raise HTTPException(status_code=500, detail=error_msg)
+
+    logger.info(f"Removed HACS repository: {full_name}")
+    category = info.get("category")
+    return Response(
+        success=True,
+        message=f"Removed HACS repository: {full_name}",
+        data={
+            "repository": full_name,
+            "repository_id": repository_id,
+            "category": category,
+            "restart_needed": category in ["integration", "python_script"],
+            "note": (
+                "HACS removed the downloaded files and, for a dashboard card, its Lovelace resource. "
+                "An integration's config entry is still there; delete that separately if it should go too. "
+                "Restart Home Assistant if this was an integration."
+            ),
+        },
+    )
 
 
 @router.get("/search", response_model=Response, dependencies=[Depends(verify_token)])

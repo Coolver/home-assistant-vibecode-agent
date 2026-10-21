@@ -10,6 +10,20 @@ from app.services.script_mixin import ScriptMixin
 
 logger = logging.getLogger('ha_cursor_agent')
 
+
+def _scrub_submitted_values(text: str, data: Any) -> str:
+    """Drop submitted strings from an error body so a failed flow cannot echo a password into the log."""
+    if not isinstance(data, dict):
+        return text
+    scrubbed = text
+    for value in data.values():
+        if isinstance(value, str) and len(value) >= 4:
+            scrubbed = scrubbed.replace(value, "***")
+        elif isinstance(value, dict):
+            scrubbed = _scrub_submitted_values(scrubbed, value)
+    return scrubbed
+
+
 class HomeAssistantClient(AutomationMixin, ScriptMixin):
     """Client for Home Assistant API"""
     
@@ -59,17 +73,20 @@ class HomeAssistantClient(AutomationMixin, ScriptMixin):
         data: Optional[Dict] = None,
         params: Optional[Dict[str, Any]] = None,
         timeout: Optional[int] = None,
-        suppress_404_logging: bool = False
+        suppress_404_logging: bool = False,
+        redact: bool = False
     ) -> Dict:
         """Make HTTP request to HA API with retry on transient failures.
         
         Args:
             suppress_404_logging: If True, 404 errors will be logged as DEBUG instead of ERROR
+            redact: If True, log only the keys of `data` (config flow input can hold passwords)
         """
         url = f"{self.url}/api/{endpoint}"
         timeout_seconds = timeout if timeout is not None else 240
+        log_data = sorted(data) if redact and isinstance(data, dict) else data
         
-        logger.info(f"HA API Request: {method} {url}, Data: {data}, Params: {params}, Timeout: {timeout_seconds}s")
+        logger.info(f"HA API Request: {method} {url}, Data: {log_data}, Params: {params}, Timeout: {timeout_seconds}s")
         
         last_error: Optional[Exception] = None
         for attempt in range(self._MAX_RETRIES):
@@ -91,10 +108,12 @@ class HomeAssistantClient(AutomationMixin, ScriptMixin):
 
                     if response.status >= 400:
                         text = await response.text()
+                        if redact:
+                            text = _scrub_submitted_values(text, data)
                         if response.status == 404 and suppress_404_logging:
                             logger.debug(f"HA API 404 (expected): {text} | URL: {url}")
                         else:
-                            logger.error(f"HA API error: {response.status} - {text} | URL: {url} | Data: {data} | Params: {params}")
+                            logger.error(f"HA API error: {response.status} - {text} | URL: {url} | Data: {log_data} | Params: {params}")
                         raise Exception(f"HA API error: {response.status} - {text}")
                     
                     logger.debug(f"HA API success: {method} {url} -> {response.status}")
@@ -109,7 +128,7 @@ class HomeAssistantClient(AutomationMixin, ScriptMixin):
                     raise Exception(f"Failed to connect to Home Assistant: {e}")
         
         raise Exception(f"Failed to connect to Home Assistant: {last_error}")
-    
+
     async def get_states(self) -> List[Dict]:
         """Get all entity states"""
         return await self._request('GET', 'states')
@@ -226,7 +245,49 @@ class HomeAssistantClient(AutomationMixin, ScriptMixin):
         except Exception as e:
             logger.error(f"Failed to rename entity via WebSocket: {e}")
             raise Exception(f"Failed to rename entity {old_entity_id} to {new_entity_id}: {e}")
-    
+
+    # ==================== Config entries and flows ====================
+
+    async def list_config_entries(self) -> List[Dict]:
+        """List all config entries (integrations and UI helpers)"""
+        return await self._request('GET', 'config/config_entries/entry')
+
+    async def reload_config_entry(self, entry_id: str) -> Dict:
+        """Reload one config entry"""
+        return await self._request('POST', f'config/config_entries/entry/{entry_id}/reload')
+
+    async def delete_config_entry(self, entry_id: str) -> Dict:
+        """Delete a config entry, removing the integration or helper and its entities"""
+        return await self._request('DELETE', f'config/config_entries/entry/{entry_id}')
+
+    async def start_config_flow(self, handler: str, show_advanced_options: bool = False) -> Dict:
+        """Start a config flow, as 'Add integration' / 'Create helper' does in the UI"""
+        return await self._request('POST', 'config/config_entries/flow',
+                                   data={'handler': handler, 'show_advanced_options': show_advanced_options})
+
+    async def config_flow_step(self, flow_id: str, user_input: Dict) -> Dict:
+        """Submit the current step of a config flow"""
+        return await self._request('POST', f'config/config_entries/flow/{flow_id}',
+                                   data=user_input, redact=True)
+
+    async def abort_config_flow(self, flow_id: str) -> Dict:
+        """Abort a config flow in progress"""
+        return await self._request('DELETE', f'config/config_entries/flow/{flow_id}')
+
+    async def start_options_flow(self, entry_id: str) -> Dict:
+        """Start the options flow ('Configure') of a config entry"""
+        return await self._request('POST', 'config/config_entries/options/flow',
+                                   data={'handler': entry_id})
+
+    async def options_flow_step(self, flow_id: str, user_input: Dict) -> Dict:
+        """Submit the current step of an options flow"""
+        return await self._request('POST', f'config/config_entries/options/flow/{flow_id}',
+                                   data=user_input, redact=True)
+
+    async def abort_options_flow(self, flow_id: str) -> Dict:
+        """Abort an options flow in progress"""
+        return await self._request('DELETE', f'config/config_entries/options/flow/{flow_id}')
+
 
 # Global client instance
 ha_client = HomeAssistantClient()

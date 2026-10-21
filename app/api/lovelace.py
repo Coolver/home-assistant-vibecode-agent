@@ -413,8 +413,8 @@ async def apply_dashboard(request: ApplyDashboardRequest):
                 config_commit_msg = request.commit_message or f"Register dashboard in config: {lovelace_path}"
                 await git_manager.commit_changes(
                     config_commit_msg,
-                skip_if_processing=True
-            )
+                    skip_if_processing=False,
+                )
         
         note = 'Dashboard created successfully!'
         if dashboard_registered:
@@ -501,7 +501,7 @@ async def delete_dashboard(filename: str, remove_from_config: bool = True, creat
                 commit_msg += " (removed from config)"
             await git_manager.commit_changes(
                 commit_msg,
-                skip_if_processing=True
+                skip_if_processing=False,
             )
         
         # Reload core config if config was modified (safer than full restart)

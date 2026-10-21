@@ -8,6 +8,52 @@ import logging
 
 logger = logging.getLogger('ha_cursor_agent')
 
+_BLOCKED_FILENAMES = {"secrets.yaml", ".secrets.yaml"}
+_BLOCKED_SUFFIXES = (".key", ".pem", ".crt")
+_BLOCKED_STORAGE_EXACT = {"core.config_entries", "cloud", "application_credentials"}
+_BLOCKED_STORAGE_PREFIXES = ("auth", "http")
+
+
+class SensitivePathError(ValueError):
+    """Raised when a file API call targets credentials or key material."""
+
+
+def allow_sensitive_files() -> bool:
+    return os.getenv("ALLOW_SENSITIVE_FILES", "false").strip().lower() in ("1", "true", "yes")
+
+
+def is_sensitive_relative_path(relative_path: str) -> bool:
+    """True for files that usually hold credentials.
+
+    Dashboards and the rest of `.storage` (registries, lovelace) stay readable.
+    `ALLOW_SENSITIVE_FILES=true` turns the block off.
+    """
+    if allow_sensitive_files():
+        return False
+    rel = relative_path.replace("\\", "/").strip("/")
+    if not rel or rel == ".":
+        return False
+    parts = [part for part in rel.split("/") if part not in ("", ".")]
+    collapsed = []
+    for part in parts:
+        if part == "..":
+            if not collapsed:
+                return False
+            collapsed.pop()
+        else:
+            collapsed.append(part)
+    if not collapsed:
+        return False
+    name = collapsed[-1]
+    if name in _BLOCKED_FILENAMES or name.lower().endswith(_BLOCKED_SUFFIXES):
+        return True
+    if len(collapsed) >= 2 and collapsed[0] == ".storage":
+        storage_name = collapsed[1]
+        if storage_name in _BLOCKED_STORAGE_EXACT or storage_name.startswith(_BLOCKED_STORAGE_PREFIXES):
+            return True
+    return False
+
+
 class FileManager:
     """Manages Home Assistant configuration files"""
     
@@ -29,6 +75,18 @@ class FileManager:
         # Security: ensure path is within config directory
         if not str(full_path.resolve()).startswith(str(self.config_path.resolve())):
             raise ValueError(f"Path outside config directory: {relative_path}")
+
+        try:
+            rel = full_path.resolve().relative_to(self.config_path.resolve()).as_posix()
+        except ValueError:
+            raise ValueError(f"Path outside config directory: {relative_path}")
+        if is_sensitive_relative_path(rel):
+            logger.warning(f"Blocked sensitive file: {rel}")
+            raise SensitivePathError(
+                "This file is blocked because it can contain credentials "
+                "(secrets, keys, or Home Assistant auth and config entries). "
+                "Set the add-on option allow_sensitive_files to true to allow it."
+            )
         
         return full_path
     
@@ -44,6 +102,8 @@ class FileManager:
             for item in dir_path.rglob(pattern):
                 if item.is_file():
                     rel_path = item.relative_to(self.config_path)
+                    if is_sensitive_relative_path(rel_path.as_posix()):
+                        continue
                     files.append({
                         "path": str(rel_path),
                         "name": item.name,
@@ -116,14 +176,14 @@ class FileManager:
             
             logger.info(f"Wrote file: {file_path} ({len(content)} bytes)")
             
-            # Commit changes after writing (if git enabled and auto mode is on)
-            # Use custom commit_message if provided, otherwise default
+            # Commit the write even if a checkpoint is open. The checkpoint
+            # already stored the previous state; skipping here dropped the edit.
             commit_hash = None
             if git_manager.git_versioning_auto:
                 commit_msg = commit_message or f"Write file: {file_path}"
                 commit_hash = await git_manager.commit_changes(
                     commit_msg,
-                    skip_if_processing=True
+                    skip_if_processing=False
                 )
             
             return {
@@ -192,10 +252,17 @@ class FileManager:
             )
             
             full_path.unlink()
+
+            commit_hash = None
+            if git_manager.git_versioning_auto:
+                commit_hash = await git_manager.commit_changes(
+                    f"Delete file: {file_path}",
+                    skip_if_processing=False,
+                )
             
             logger.info(f"Deleted file: {file_path}")
             
-            return {"success": True, "path": file_path}
+            return {"success": True, "path": file_path, "commit": commit_hash}
         except Exception as e:
             logger.error(f"Error deleting file {file_path}: {e}")
             raise

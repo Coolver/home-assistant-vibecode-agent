@@ -258,15 +258,17 @@ async def create_checkpoint(user_request: str = Query(..., description="Descript
 @router.post("/checkpoint/end")
 async def end_checkpoint():
     """
-    End request processing - re-enable auto-commits
-    
-    This should be called at the end of user request processing
+    Close the open checkpoint and commit any changes still waiting.
+
+    Call this at the end of a request. Edits are also committed as they
+    happen, so a missed call does not drop them.
     """
     try:
-        git_manager.end_request_processing()
+        commit_hash = await git_manager.end_checkpoint()
         return {
             "success": True,
-            "message": "Request processing ended - auto-commits re-enabled"
+            "message": "Checkpoint closed",
+            "commit_hash": commit_hash,
         }
     except Exception as e:
         logger.error(f"Failed to end checkpoint: {e}")

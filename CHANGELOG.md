@@ -2,13 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [2.10.49] - 2026-10-22
 
-### HACS repository install from MCP clients
+**Pair with MCP client 3.2.32.**
 
-**What went wrong:** `ha_hacs_install_repository` (`POST /api/hacs/install_repository`) treated `repository` as a query string. The MCP client posts JSON `{ "repository", "category" }`, so FastAPI returned 422 (`query.repository` field required) before HACS was called.
+Thank you. Almost everything in this release started as a pull request or an issue.
 
-**What we changed:** The endpoint now reads those fields from the JSON body and still accepts the legacy query-string form.
+- [@CrazyCoder](https://github.com/CrazyCoder) ([#55](https://github.com/Coolver/home-assistant-vibecode-agent/pull/55)) kept automation fields the assistant does not mention, instead of quietly dropping them.
+- [@arno82](https://github.com/arno82) ([#54](https://github.com/Coolver/home-assistant-vibecode-agent/pull/54)) stopped Home Assistant backups and cache files from being copied into the shadow git.
+- [@Thijs226](https://github.com/Thijs226) ([#56](https://github.com/Coolver/home-assistant-vibecode-agent/pull/56)) made a failed WebSocket command come back as a failure. Renaming an entity to an id that is already taken no longer looks like success.
+- [@telcopro](https://github.com/telcopro) ([#57](https://github.com/Coolver/home-assistant-vibecode-agent/pull/57)) limited the setup panel to Home Assistant Ingress and removed the open CORS header. The config-flow tools from [#58](https://github.com/Coolver/home-assistant-vibecode-agent/pull/58) are in this release too. That pull request was not merged as-is, because its WebSocket change overlapped #56.
+- [@olomouckyorel](https://github.com/olomouckyorel) ([#51](https://github.com/Coolver/home-assistant-vibecode-agent/pull/51)) fixed HACS installs from the editor, after [@mnestrud](https://github.com/mnestrud) showed in [#44](https://github.com/Coolver/home-assistant-vibecode-agent/issues/44) that every call failed before HACS was even contacted.
+- [@eyal0](https://github.com/eyal0) ([#53](https://github.com/Coolver/home-assistant-vibecode-agent/issues/53)) caught checkpoints that never saved the edits.
+- [@GammelSami](https://github.com/GammelSami) ([#52](https://github.com/Coolver/home-assistant-vibecode-agent/issues/52)) asked us to stop handing the assistant `secrets.yaml` and credential storage by default.
+- [@gvillo](https://github.com/gvillo) ([#49](https://github.com/Coolver/home-assistant-vibecode-agent/issues/49)) pointed out that an automation could be created and still not placed in a category.
+- [@mnestrud](https://github.com/mnestrud) also wrote up the Core log ([#48](https://github.com/Coolver/home-assistant-vibecode-agent/issues/48)), service responses ([#47](https://github.com/Coolver/home-assistant-vibecode-agent/issues/47)), and removing a single HACS repository ([#46](https://github.com/Coolver/home-assistant-vibecode-agent/issues/46)).
+
+### The key panel stays inside Home Assistant
+
+The page that shows the Agent Key was reachable on the published port, and the API sent a wildcard CORS header. The panel is now served only through Ingress. The API itself is unchanged: the same key still works.
+
+### Checkpoints remember the work
+
+Opening a checkpoint used to turn off auto-commits, and closing it did not commit either. If the closing call was skipped, later edits were never saved. Each change is committed as it happens now. Closing the checkpoint commits anything still left over.
+
+### Credential files stay out of the chat
+
+The file tools no longer read or write `secrets.yaml`, key and certificate files, or Home Assistant's auth and config-entry storage. Dashboards and automation storage stay readable. There is an add-on option, `allow_sensitive_files`, if you really want the old behaviour. It is off.
+
+### Categories, logs, and answers that used to disappear
+
+An automation or script can be given labels and a category, and categories can be listed and created. `ha_core_logs` reads the Home Assistant Core journal that Settings → System → Logs shows. `ha_get_logs` is still this add-on's own log. `ha_call_service` can ask for the service response, which is how forecasts, calendar events, and to-do items come back. A single HACS repository can be removed without uninstalling HACS.
+
+### Integrations that only exist as a dialog
+
+Adding an integration, turning a switch into a light, and the Configure button on an integration are config flows. Those can be started, stepped through, reloaded, and deleted. Delete asks for `confirm=true`. Values typed into a flow are not written to the add-on log, and if Home Assistant echoes one of them in an error, that value is removed before the error is logged.
 
 ## [2.10.48] - 2026-08-03
 

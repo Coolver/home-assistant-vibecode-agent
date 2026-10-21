@@ -190,6 +190,64 @@ class SupervisorClient:
                     raise Exception(f"Failed to get add-on logs: {e}")
         
         raise Exception(f"Failed to get add-on logs: {last_error}")
+
+    # Journal sources the manager role may read. Kept to a fixed map so a
+    # caller cannot turn this into an arbitrary Supervisor path.
+    JOURNAL_SOURCES = {
+        "core": "core/logs",
+        "supervisor": "supervisor/logs",
+        "host": "host/logs",
+    }
+
+    async def get_journal_logs(self, source: str, lines: int) -> str:
+        """Read a Supervisor journal (Core, Supervisor, or the host).
+
+        Uses the lines/no_colors query form. Supervisor ignores Range when
+        lines is set, and no_colors asks it to drop ANSI escapes.
+        """
+        endpoint = self.JOURNAL_SOURCES.get(source)
+        if endpoint is None:
+            raise ValueError(f"Unknown log source: {source}")
+
+        url = f"{self.base_url}/{endpoint}"
+        headers = {**self.headers, "Accept": "text/plain"}
+        params = {"lines": str(lines), "no_colors": ""}
+
+        last_error: Optional[Exception] = None
+        for attempt in range(self._MAX_RETRIES):
+            try:
+                session = await self._get_session()
+                async with session.get(
+                    url,
+                    headers=headers,
+                    params=params,
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as response:
+                    if response.status in self._RETRYABLE_STATUSES and attempt < self._MAX_RETRIES - 1:
+                        logger.warning(
+                            f"Supervisor journal transient error {response.status}, "
+                            f"retrying ({attempt + 1}/{self._MAX_RETRIES})..."
+                        )
+                        await asyncio.sleep(self._RETRY_BACKOFF[attempt])
+                        continue
+
+                    if response.status >= 400:
+                        text = (await response.text())[:300]
+                        raise Exception(f"Failed to get {source} logs: {response.status} - {text}")
+
+                    return await response.text()
+            except (aiohttp.ClientError, aiohttp.ServerDisconnectedError, asyncio.TimeoutError) as e:
+                last_error = e
+                if attempt < self._MAX_RETRIES - 1:
+                    logger.warning(
+                        f"Supervisor journal connection error ({type(e).__name__}), "
+                        f"retrying ({attempt + 1}/{self._MAX_RETRIES})..."
+                    )
+                    await asyncio.sleep(self._RETRY_BACKOFF[attempt])
+                else:
+                    raise Exception(f"Failed to get {source} logs: {e}")
+
+        raise Exception(f"Failed to get {source} logs: {last_error}")
     
     # ==================== Add-on Lifecycle ====================
     

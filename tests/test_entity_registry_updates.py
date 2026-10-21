@@ -44,6 +44,68 @@ def test_disabled_flag_maps_to_home_assistant_field(registry_api, disabled, disa
     }
 
 
+@pytest.mark.parametrize("hidden, hidden_by", [(True, "user"), (False, None)])
+def test_hidden_flag_maps_to_home_assistant_field(registry_api, hidden, hidden_by):
+    app, client, _ = registry_api
+    with TestClient(app) as http:
+        response = http.post("/api/registries/entities/update", json={
+            "entity_id": "sensor.example", "hidden": hidden,
+        })
+
+    assert response.status_code == 200
+    assert response.json()["updated_fields"] == {"hidden": hidden}
+    message = client.ws.send_json.call_args.args[0]
+    assert message["hidden_by"] == hidden_by
+    assert "hidden" not in message
+    assert "disabled_by" not in message
+
+
+def test_create_category_sends_scope_and_name(registry_api):
+    app, client, _ = registry_api
+    with TestClient(app) as http:
+        response = http.post("/api/registries/categories/create", json={
+            "scope": "automation",
+            "name": "Morning",
+        })
+
+    assert response.status_code == 200
+    message = client.ws.send_json.call_args.args[0]
+    assert message["type"] == "config/category_registry/create"
+    assert message["scope"] == "automation"
+    assert message["name"] == "Morning"
+    assert "icon" not in message
+
+
+def test_update_category_requires_a_change(registry_api):
+    app, client, _ = registry_api
+    with TestClient(app) as http:
+        response = http.post("/api/registries/categories/update", json={
+            "scope": "automation",
+            "category_id": "cat_morning",
+        })
+
+    assert response.status_code == 400
+    client.ws.send_json.assert_not_called()
+
+
+def test_labels_and_categories_are_forwarded(registry_api):
+    app, client, _ = registry_api
+    with TestClient(app) as http:
+        response = http.post("/api/registries/entities/update", json={
+            "entity_id": "automation.morning",
+            "labels": ["label_lights"],
+            "categories": {"automation": "cat_morning"},
+        })
+
+    assert response.status_code == 200
+    assert response.json()["updated_fields"]["labels"] == ["label_lights"]
+    message = client.ws.send_json.call_args.args[0]
+    assert message["type"] == "config/entity_registry/update"
+    assert message["labels"] == ["label_lights"]
+    assert message["categories"] == {"automation": "cat_morning"}
+    assert "disabled_by" not in message
+
+
 def test_name_update_leaves_disabled_state_untouched(registry_api):
     app, client, _ = registry_api
     with TestClient(app) as http:
@@ -56,6 +118,8 @@ def test_name_update_leaves_disabled_state_untouched(registry_api):
     assert message["name"] == "Example"
     assert "disabled_by" not in message
     assert "disabled" not in message
+    assert "hidden_by" not in message
+    assert "hidden" not in message
 
 
 def test_home_assistant_rejection_is_not_reported_as_success(registry_api):
