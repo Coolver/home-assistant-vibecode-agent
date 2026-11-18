@@ -23,6 +23,7 @@ options:
   port: 8099
   log_level: info
   git_versioning_auto: true
+  ignore_dirs: ""
   max_backups: 30
   api_key: ""
   allow_sensitive_files: false
@@ -31,6 +32,7 @@ schema:
   port: int
   log_level: list(debug|info|warning|error)
   git_versioning_auto: bool
+  ignore_dirs: str?
   max_backups: int
   api_key: str?
   allow_sensitive_files: bool?
