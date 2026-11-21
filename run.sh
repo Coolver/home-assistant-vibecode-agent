@@ -4,6 +4,7 @@
 PORT=$(bashio::config 'port')
 LOG_LEVEL=$(bashio::config 'log_level')
 GIT_VERSIONING_AUTO=$(bashio::config 'git_versioning_auto')
+IGNORE_DIRS=$(bashio::config 'ignore_dirs')
 MAX_BACKUPS=$(bashio::config 'max_backups')
 if bashio::config.exists 'allow_sensitive_files'; then
     ALLOW_SENSITIVE_FILES=$(bashio::config 'allow_sensitive_files')
@@ -19,6 +20,7 @@ HA_URL="http://supervisor/core"
 export PORT="${PORT}"
 export LOG_LEVEL="${LOG_LEVEL}"
 export GIT_VERSIONING_AUTO="${GIT_VERSIONING_AUTO}"
+export IGNORE_DIRS="${IGNORE_DIRS}"
 export MAX_BACKUPS="${MAX_BACKUPS}"
 export ALLOW_SENSITIVE_FILES="${ALLOW_SENSITIVE_FILES}"
 export HA_TOKEN="${HA_TOKEN}"
@@ -28,6 +30,7 @@ export CONFIG_PATH="/config"
 bashio::log.info "Starting HA Vibecode Agent on port ${PORT}..."
 bashio::log.info "Log level: ${LOG_LEVEL}"
 bashio::log.info "Git versioning auto: ${GIT_VERSIONING_AUTO}"
+bashio::log.info "Ignore dirs: ${IGNORE_DIRS}"
 bashio::log.info "Allow sensitive files: ${ALLOW_SENSITIVE_FILES}"
 
 # Start FastAPI application

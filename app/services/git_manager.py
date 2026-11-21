@@ -12,6 +12,23 @@ import subprocess
 
 logger = logging.getLogger('ha_cursor_agent')
 
+
+def _parse_ignore_dirs(raw):
+    """Comma-separated directory prefixes relative to /config.
+
+    Whitespace is trimmed. A leading './' or '/' and a trailing '/' are
+    removed. Empty entries are ignored.
+    """
+    prefixes = []
+    for entry in (raw or '').split(','):
+        prefix = entry.strip()
+        while prefix.startswith('./'):
+            prefix = prefix[2:]
+        prefix = prefix.strip('/')
+        if prefix:
+            prefixes.append(prefix)
+    return tuple(prefixes)
+
 class GitManager:
     """Manages Git versioning for config files (using a shadow Git repo)"""
     
@@ -28,7 +45,10 @@ class GitManager:
         # Git is always enabled in shadow repo, but commits only happen based on this setting
         self.git_versioning_auto = os.getenv('GIT_VERSIONING_AUTO', 'true').lower() == 'true'
         self.max_backups = int(os.getenv('MAX_BACKUPS', '30'))
-        logger.info(f"GitManager initialized: max_backups={self.max_backups}, auto={self.git_versioning_auto}")
+        self.ignore_dirs = _parse_ignore_dirs(os.getenv('IGNORE_DIRS', ''))
+        logger.info(
+            f"GitManager initialized: max_backups={self.max_backups}, auto={self.git_versioning_auto}, ignore_dirs={self.ignore_dirs}"
+        )
         self.repo = None
         # While a checkpoint is open, skip the extra "backup before" commit.
         # The change itself is still committed. Forgetting ha_end_checkpoint
@@ -308,6 +328,11 @@ secrets.yaml
             if rel_path.startswith(prefix):
                 return False
 
+        # ignore_dirs: directory prefixes relative to /config.
+        for prefix in self.ignore_dirs:
+            if rel_path == prefix or rel_path.startswith(prefix + '/'):
+                return False
+
         return True
 
     def _sync_config_to_shadow(self):
@@ -357,17 +382,17 @@ secrets.yaml
         # Remove files from shadow_root that are no longer present in /config
         # BUT preserve export/ directory (created by agent, not synced from /config)
         for root, dirs, files in os.walk(shadow_root):
-            # Never touch .git inside the shadow repo
-            if '.git' in dirs:
-                dirs.remove('.git')
-            
-            # Skip export/ directory - it's managed by agent, not synced from /config
-            if 'export' in dirs:
-                dirs.remove('export')
-
             rel_root = os.path.relpath(root, shadow_root)
             if rel_root == '.':
                 rel_root = ''
+
+            # Never touch .git inside the shadow repo
+            if rel_root == '' and '.git' in dirs:
+                dirs.remove('.git')
+
+            # Skip export/ directory - it's managed by agent, not synced from /config
+            if 'export' in dirs:
+                dirs.remove('export')
 
             # Skip export/ directory entirely
             if rel_root.startswith('export'):

@@ -417,6 +417,7 @@ Common issues:
 
 - Git versioning is always enabled in shadow repository (`/config/ha_vibecode_git`)
 - Check `git_versioning_auto` setting for auto/manual commit mode
+- Use `ignore_dirs` to leave directories out of the shadow repository (comma-separated paths relative to `/config`, e.g. `custom_components, esphome/.esphome`)
 - View logs for Git errors
 - Ensure `/config` is writable
 

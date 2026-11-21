@@ -14,6 +14,7 @@ services:
       - PORT=${PORT:-8099}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - GIT_VERSIONING_AUTO=${GIT_VERSIONING_AUTO:-true}
+      - IGNORE_DIRS=${IGNORE_DIRS:-}
       - MAX_BACKUPS=${MAX_BACKUPS:-30}
       - CONFIG_PATH=/config
     volumes:
