@@ -4,7 +4,13 @@
 PORT=$(bashio::config 'port')
 LOG_LEVEL=$(bashio::config 'log_level')
 GIT_VERSIONING_AUTO=$(bashio::config 'git_versioning_auto')
-IGNORE_DIRS=$(bashio::config 'ignore_dirs')
+# Missing key comes back as the string "null" (addon upgraded before the
+# option is saved). That would ignore a directory literally named null.
+if bashio::config.exists 'ignore_dirs'; then
+    IGNORE_DIRS=$(bashio::config 'ignore_dirs')
+else
+    IGNORE_DIRS=""
+fi
 MAX_BACKUPS=$(bashio::config 'max_backups')
 if bashio::config.exists 'allow_sensitive_files'; then
     ALLOW_SENSITIVE_FILES=$(bashio::config 'allow_sensitive_files')

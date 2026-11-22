@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.10.51] - 2026-11-22
+
+**Pair with MCP client 3.2.32.** No MCP package bump.
+
+Thank you.
+
+- [@pit3k](https://github.com/pit3k) ([#60](https://github.com/Coolver/home-assistant-vibecode-agent/pull/60)) added `ignore_dirs`, so directories that do not need history can stay out of the shadow git.
+
+### Heavy directories can stay out of the shadow git
+
+On some setups every sync copied hundreds of megabytes into `/config/ha_vibecode_git`, mostly from `custom_components`, `tts`, and `esphome/.esphome`.
+
+`ignore_dirs` is an optional, comma-separated list of directories relative to `/config`. Standalone Docker reads `IGNORE_DIRS`. Leave it empty and the sync behaves as before.
+
+`scripts` skips `scripts/a.yaml` and still copies `scripts2`. The next sync deletes copies that are already under an excluded directory. The shadow repository's own `.git` stays, and the files in the live `/config` stay where they are.
+
+The sync stops at the excluded directory instead of walking every file inside it. After an add-on update, a missing `ignore_dirs` stays empty until the option is saved.
+
 ## [2.10.50] - 2026-10-22
 
 **Pair with MCP client 3.2.32.**

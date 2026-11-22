@@ -18,6 +18,7 @@ def test_empty_option_uses_builtin_exclusions_only(tmp_path, monkeypatch):
     assert manager._should_include_path("esphome/.esphome/cache.json", False)
     assert manager._should_include_path("scripts/a.yaml", False)
     assert manager._should_include_path("scripts2/a.yaml", False)
+    assert manager._should_include_path("custom_components", True)
     assert not manager._should_include_path("secrets.yaml", False)
     assert not manager._should_include_path(".storage", True)
 
@@ -40,12 +41,43 @@ def test_prefixes_exclude_top_level_and_nested_dirs(tmp_path, monkeypatch):
     assert not manager._should_include_path("tts/hello.mp3", False)
     assert not manager._should_include_path("esphome/.esphome/cache.json", False)
     assert not manager._should_include_path("image", False)
+    # os.walk prunes only when the directory itself is excluded.
+    assert not manager._should_include_path("custom_components", True)
+    assert not manager._should_include_path("custom_components/foo", True)
+    assert not manager._should_include_path("scripts", True)
+    assert not manager._should_include_path("esphome/.esphome", True)
+    assert manager._should_include_path("esphome", True)
     # A longer name is not the same prefix.
     assert manager._should_include_path("scripts2/a.yaml", False)
     assert manager._should_include_path("scripts2", False)
+    assert manager._should_include_path("scripts2", True)
     assert manager._should_include_path("esphome/device.yaml", False)
     assert manager._should_include_path("configuration.yaml", False)
     assert not manager._should_include_path("secrets.yaml", False)
+
+
+def test_sync_does_not_walk_into_ignored_directory(tmp_path, monkeypatch):
+    (tmp_path / "custom_components" / "foo").mkdir(parents=True)
+    (tmp_path / "custom_components" / "foo" / "__init__.py").write_text("x\n", encoding="utf-8")
+    (tmp_path / "configuration.yaml").write_text("homeassistant:\n", encoding="utf-8")
+
+    manager = _manager(tmp_path, monkeypatch, "custom_components")
+    seen = []
+    original = manager._should_include_path
+
+    def spy(rel_path, is_dir):
+        seen.append((rel_path.replace("\\", "/"), is_dir))
+        return original(rel_path, is_dir)
+
+    manager._should_include_path = spy
+    manager._sync_config_to_shadow()
+
+    assert ("custom_components", True) in seen
+    assert not any(path.startswith("custom_components/") for path, _ in seen)
+    shadow = tmp_path / "ha_vibecode_git"
+    assert not (shadow / "custom_components").exists()
+    assert (shadow / "configuration.yaml").is_file()
+    assert (tmp_path / "custom_components" / "foo" / "__init__.py").is_file()
 
 
 def test_sync_skips_prefixed_directories(tmp_path, monkeypatch):

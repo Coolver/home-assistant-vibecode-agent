@@ -1,6 +1,6 @@
 # HA Vibecode Agent
 
-[![Version](https://img.shields.io/badge/version-2.10.50-blue.svg)](https://github.com/Coolver/home-assistant-vibecode-agent)
+[![Version](https://img.shields.io/badge/version-2.10.51-blue.svg)](https://github.com/Coolver/home-assistant-vibecode-agent)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![MCP Package](https://img.shields.io/npm/v/@coolver/home-assistant-mcp?label=MCP%20Package)](https://www.npmjs.com/package/@coolver/home-assistant-mcp)
 [![Landing Page](https://img.shields.io/badge/Landing%20Page-coolver.github.io-blueviolet)](https://coolver.github.io/home-assistant-vibecode-agent/)
@@ -30,15 +30,13 @@ https://github.com/user-attachments/assets/0df48019-06c0-48dd-82ad-c7fe0734ddb3
 **Full YouTube Demo:**
 - [How to control Home Assistant from Cursor](https://youtu.be/xocbWonWdoc)
 
-## What's new in 2.10.50
+## What's new in 2.10.51
 
-This one is mostly thanks to people who sent pull requests and wrote issues. Pair it with MCP client **3.2.32**.
+Thank you to [@pit3k](https://github.com/pit3k) ([#60](https://github.com/Coolver/home-assistant-vibecode-agent/pull/60)). Pair it with MCP client **3.2.32**. No MCP package bump.
 
-The setup page with the API key is only available through Home Assistant Ingress now, and the open CORS header is gone. Checkpoints save the edits as they happen, so a forgotten "end checkpoint" no longer throws the work away. `secrets.yaml`, key files, and Home Assistant's auth and config-entry storage are blocked from the file tools unless you turn that back on. Failed Home Assistant commands are reported as failures. Extra keys on an automation are kept. Backups and cache files are no longer copied into the shadow git.
+`ignore_dirs` keeps chosen directories out of the shadow git. A comma-separated list such as `custom_components, tts, esphome/.esphome` is enough. An empty value leaves the sync as it is. The next sync drops those copies from `/config/ha_vibecode_git` and does not walk the excluded trees. Files in `/config` stay put.
 
-The assistant can also put an automation or script in a category, read the real Home Assistant Core log, get the data back from a service such as a weather forecast, install a HACS repository from the editor (that call used to fail every time), and remove one HACS card without uninstalling HACS. Dialogs that used to be UI-only, such as changing a switch into a light or configuring an integration, can be driven step by step.
-
-Thank you to [@CrazyCoder](https://github.com/CrazyCoder), [@arno82](https://github.com/arno82), [@Thijs226](https://github.com/Thijs226), [@telcopro](https://github.com/telcopro), [@olomouckyorel](https://github.com/olomouckyorel), [@eyal0](https://github.com/eyal0), [@GammelSami](https://github.com/GammelSami), [@gvillo](https://github.com/gvillo), and [@mnestrud](https://github.com/mnestrud). The longer note, with a line for each report, is in the changelog. That is the text Home Assistant shows as the add-on update info.
+The longer note is in the changelog. That is the text Home Assistant shows as the add-on update info.
 
 ---
 

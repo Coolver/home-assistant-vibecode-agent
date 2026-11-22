@@ -277,6 +277,12 @@ secrets.yaml
         if parts[0] in ('.git', 'ha_vibecode_git'):
             return False
 
+        # User prefixes. os.walk prunes a directory only when this returns False
+        # for is_dir=True, so the check has to run before the early return below.
+        for prefix in self.ignore_dirs:
+            if rel_path == prefix or rel_path.startswith(prefix + '/'):
+                return False
+
         # Exclude well-known heavy / internal directories at top-level
         if is_dir:
             if parts[0] in ('.storage', '.cloud', '.homeassistant', '.cache',
@@ -326,11 +332,6 @@ secrets.yaml
         ]
         for prefix in dir_prefix_patterns:
             if rel_path.startswith(prefix):
-                return False
-
-        # ignore_dirs: directory prefixes relative to /config.
-        for prefix in self.ignore_dirs:
-            if rel_path == prefix or rel_path.startswith(prefix + '/'):
                 return False
 
         return True
